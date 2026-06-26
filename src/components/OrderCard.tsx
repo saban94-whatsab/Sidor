@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Order, OrderStatus, STATUS_OPTIONS } from "../types";
 import { Calendar, Hash, User, MapPin, Phone, FileText, Edit, Trash2, ExternalLink, Tag, MessageSquare, Clock, Bell } from "lucide-react";
 
@@ -27,6 +28,35 @@ export default function OrderCard({
   onSendLoadingCommand,
   onSendDeliveryUpdate
 }: OrderCardProps) {
+  const [prevStatus, setPrevStatus] = useState<OrderStatus>(order.status);
+  const [isFlashing, setIsFlashing] = useState(false);
+
+  useEffect(() => {
+    if (order.status !== prevStatus) {
+      setIsFlashing(true);
+      setPrevStatus(order.status);
+      const timer = setTimeout(() => {
+        setIsFlashing(false);
+      }, 1500); // Animation highlight lasts 1.5s
+      return () => clearTimeout(timer);
+    }
+  }, [order.status, prevStatus]);
+
+  const getFlashClass = () => {
+    if (!isFlashing) return "scale-100";
+    switch (order.status) {
+      case "ממתין להכנה":
+        return "ring-4 ring-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.6)] scale-105 rotate-1 animate-pulse bg-amber-500/20 text-amber-300";
+      case "בהכנה":
+        return "ring-4 ring-cyan-500/50 shadow-[0_0_20px_rgba(34,211,238,0.6)] scale-105 -rotate-1 animate-pulse bg-cyan-500/20 text-cyan-300";
+      case "מוכן לאיסוף":
+        return "ring-4 ring-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.6)] scale-105 rotate-1 animate-pulse bg-emerald-500/20 text-emerald-300";
+      case "נשלח":
+        return "ring-4 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.6)] scale-105 -rotate-1 animate-pulse bg-purple-500/20 text-purple-300";
+      default:
+        return "scale-105 animate-pulse";
+    }
+  };
   
   // Custom classes depending on status
   const getStatusConfig = (status: OrderStatus) => {
@@ -189,9 +219,9 @@ export default function OrderCard({
             id={`status-select-${order.id}`}
             value={order.status}
             onChange={(e) => onStatusChange(order.id, e.target.value as OrderStatus)}
-            className={`appearance-none rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-md focus:outline-none focus:ring-1 focus:ring-slate-400 pl-8 pr-3 text-right cursor-pointer ${config.badge} ${
+            className={`appearance-none rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all duration-500 ease-out shadow-md focus:outline-none focus:ring-1 focus:ring-slate-400 pl-8 pr-3 text-right cursor-pointer ${config.badge} ${
               theme === "dark" ? "border-slate-800" : "border-slate-200"
-            }`}
+            } ${getFlashClass()}`}
           >
             {STATUS_OPTIONS.map((status) => (
               <option key={status} value={status} className={`${theme === "dark" ? "bg-slate-950 text-slate-200" : "bg-white text-slate-800"} py-1 font-sans`}>
