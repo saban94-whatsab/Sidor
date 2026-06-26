@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import Header from "./components/Header";
 import OrderStats from "./components/OrderStats";
 import OrderDashboard from "./components/OrderDashboard";
@@ -1423,25 +1424,42 @@ export default function App() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="orders-grid">
-              {sortedOrders.map(order => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onStatusChange={handleStatusChange}
-                  onEdit={(o) => {
-                    setEditingOrder(o);
-                    setIsFormOpen(true);
-                  }}
-                  onDelete={handleDeleteOrder}
-                  onAddNote={handleOpenNoteModal}
-                  isSelected={selectedOrderIds.includes(order.id)}
-                  onSelectChange={handleSelectOrder}
-                  theme={theme}
-                  onSendLoadingCommand={handleSendLoadingCommand}
-                  onSendDeliveryUpdate={handleSendDeliveryUpdate}
-                  onViewHistory={(o) => setHistoryOrder(o)}
-                />
-              ))}
+              <AnimatePresence mode="popLayout">
+                {sortedOrders.map((order, index) => (
+                  <motion.div
+                    key={order.id}
+                    layout
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ 
+                      type: "spring",
+                      stiffness: 280,
+                      damping: 26,
+                      opacity: { duration: 0.2 },
+                      y: { duration: 0.25, delay: Math.min(index * 0.04, 0.2) }
+                    }}
+                    className="w-full"
+                  >
+                    <OrderCard
+                      order={order}
+                      onStatusChange={handleStatusChange}
+                      onEdit={(o) => {
+                        setEditingOrder(o);
+                        setIsFormOpen(true);
+                      }}
+                      onDelete={handleDeleteOrder}
+                      onAddNote={handleOpenNoteModal}
+                      isSelected={selectedOrderIds.includes(order.id)}
+                      onSelectChange={handleSelectOrder}
+                      theme={theme}
+                      onSendLoadingCommand={handleSendLoadingCommand}
+                      onSendDeliveryUpdate={handleSendDeliveryUpdate}
+                      onViewHistory={(o) => setHistoryOrder(o)}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )
         )}
