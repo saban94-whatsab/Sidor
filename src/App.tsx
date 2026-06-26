@@ -197,6 +197,18 @@ export default function App() {
   const [selectedStatusTab, setSelectedStatusTab] = useState<string>("הכל");
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>("הכל");
   const [customDate, setCustomDate] = useState("");
+  const [dashboardView, setDashboardView] = useState<"active" | "archive">("active");
+
+  const handleSetDashboardView = (view: "active" | "archive") => {
+    setDashboardView(view);
+    if (view === "active") {
+      if (selectedStatusTab === "נשלח") {
+        setSelectedStatusTab("הכל");
+      }
+    } else {
+      setSelectedStatusTab("נשלח");
+    }
+  };
   
   // Bulk Selection state
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -788,10 +800,17 @@ export default function App() {
       order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.orderNumber.includes(searchQuery);
 
-    // 2. Status Tab Filter
-    const matchStatus = selectedStatusTab === "הכל" || order.status === selectedStatusTab;
+    // 2. Active/Archive view segmentation filter
+    const matchView = dashboardView === "active"
+      ? (order.status !== "נשלח")
+      : (order.status === "נשלח");
 
-    // 3. Date Filter
+    // 3. Status Tab Filter (only applies in Active view)
+    const matchStatus = dashboardView === "archive"
+      ? true
+      : (selectedStatusTab === "הכל" || order.status === selectedStatusTab);
+
+    // 4. Date Filter
     let matchDate = true;
     if (selectedDateFilter === "היום") {
       matchDate = order.date === todayStr;
@@ -801,7 +820,7 @@ export default function App() {
       matchDate = order.date === customDate;
     }
 
-    return matchSearch && matchStatus && matchDate;
+    return matchSearch && matchView && matchStatus && matchDate;
   });
 
   // Sorting logic
@@ -909,6 +928,9 @@ export default function App() {
           }}
           onSync={() => fetchDataFromSheet()}
           isLoading={isLoading}
+          dashboardView={dashboardView}
+          setDashboardView={handleSetDashboardView}
+          theme={theme}
         />
       ) : (
         <header className={`sticky top-0 z-40 w-full h-14 border-b flex items-center justify-between px-4 md:px-8 transition-all ${
@@ -926,6 +948,44 @@ export default function App() {
                 <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[8px] font-bold text-cyan-400 border border-cyan-500/20">פעיל</span>
               </div>
             </div>
+          </div>
+
+          {/* Active vs. Archive View Tab Switcher for Fullscreen */}
+          <div className={`flex border p-0.5 rounded-lg shrink-0 ${
+            isDark ? "bg-slate-950 border-slate-850" : "bg-slate-100 border-slate-200"
+          }`} id="fullscreen-view-switcher">
+            <button
+              id="fs-btn-view-active"
+              onClick={() => handleSetDashboardView("active")}
+              className={`px-3 py-1 rounded-md text-[10px] font-black transition-all flex items-center gap-1 cursor-pointer ${
+                dashboardView === "active"
+                  ? isDark
+                    ? "bg-slate-900 text-cyan-400 border border-slate-800 shadow-md"
+                    : "bg-white text-cyan-600 border border-slate-250 shadow-sm"
+                  : isDark
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>📋</span>
+              <span>הזמנות פעילות</span>
+            </button>
+            <button
+              id="fs-btn-view-archive"
+              onClick={() => handleSetDashboardView("archive")}
+              className={`px-3 py-1 rounded-md text-[10px] font-black transition-all flex items-center gap-1 cursor-pointer ${
+                dashboardView === "archive"
+                  ? isDark
+                    ? "bg-slate-900 text-cyan-400 border border-slate-800 shadow-md"
+                    : "bg-white text-cyan-600 border border-slate-250 shadow-sm"
+                  : isDark
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>🗄️</span>
+              <span>ארכיון היסטוריה</span>
+            </button>
           </div>
           
           <div className="flex items-center gap-3">
@@ -996,7 +1056,16 @@ export default function App() {
         {/* Top Analytics Stats Grid, Charts, and Deadline Center (Hidden in Fullscreen) */}
         {!isFullScreen && (
           <>
-            <OrderStats orders={orders} theme={theme} />
+            <OrderStats 
+              orders={orders} 
+              theme={theme} 
+              activeView={dashboardView} 
+              selectedStatusTab={selectedStatusTab} 
+              onStatClick={(view, statusTab) => {
+                handleSetDashboardView(view);
+                setSelectedStatusTab(statusTab);
+              }} 
+            />
 
             {/* Analytics Dashboard Visualizer Component */}
             <OrderDashboard orders={orders} theme={theme} />
@@ -1023,11 +1092,36 @@ export default function App() {
               if (urgentOrOverdueOrders.length === 0) return null;
 
               return (
-                <div id="deadlines-alert-center" className={`w-full p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
-                  isDark 
-                    ? "border-rose-500/20 bg-gradient-to-br from-slate-900/80 to-rose-950/10" 
-                    : "border-rose-200 bg-rose-50/50 shadow-sm text-slate-800"
-                }`} dir="rtl">
+                <motion.div 
+                  id="deadlines-alert-center" 
+                  animate={{
+                    borderColor: isDark 
+                      ? ["rgba(244, 63, 94, 0.2)", "rgba(244, 63, 94, 0.45)", "rgba(244, 63, 94, 0.2)"] 
+                      : ["rgba(244, 63, 94, 0.15)", "rgba(244, 63, 94, 0.35)", "rgba(244, 63, 94, 0.15)"],
+                    boxShadow: isDark
+                      ? [
+                          "0 0 15px rgba(244, 63, 94, 0.03)",
+                          "0 0 25px rgba(244, 63, 94, 0.12)",
+                          "0 0 15px rgba(244, 63, 94, 0.03)"
+                        ]
+                      : [
+                          "0 0 10px rgba(244, 63, 94, 0.02)",
+                          "0 0 18px rgba(244, 63, 94, 0.08)",
+                          "0 0 10px rgba(244, 63, 94, 0.02)"
+                        ]
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className={`w-full p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
+                    isDark 
+                      ? "bg-gradient-to-br from-slate-900/80 to-rose-950/10" 
+                      : "bg-rose-50/50 text-slate-800"
+                  }`} 
+                  dir="rtl"
+                >
                   <div className="absolute top-0 right-0 h-[2px] w-full bg-gradient-to-l from-rose-500 via-amber-500 to-transparent pointer-events-none" />
                   <div className="flex items-center gap-3 mb-3 text-right">
                     <span className="text-xl animate-bounce">🚨</span>
@@ -1056,8 +1150,31 @@ export default function App() {
                         diffText = h > 0 ? `נותרו עוד ${h} ש' ו-${m} דק'` : `נותרו עוד ${m} דק'`;
                       }
 
+                      // Calculate visual progress
+                      const deadlineMs = deadlineDate.getTime();
+                      const nowMs = new Date().getTime();
+                      
+                      // Find start of preparation or fallback to 45 mins estimated window before deadline
+                      const prepLog = order.statusLog?.find(entry => entry.status === "בהכנה");
+                      let startMs = prepLog ? new Date(prepLog.timestamp).getTime() : null;
+
+                      if (!startMs || isNaN(startMs)) {
+                        const firstLog = order.statusLog?.[0];
+                        const firstLogMs = firstLog ? new Date(firstLog.timestamp).getTime() : null;
+                        startMs = firstLogMs && !isNaN(firstLogMs) ? firstLogMs : deadlineMs - 45 * 60 * 1000;
+                      }
+
+                      if (startMs >= deadlineMs) {
+                        startMs = deadlineMs - 45 * 60 * 1000;
+                      }
+
+                      const totalDuration = deadlineMs - startMs;
+                      const remainingMs = deadlineMs - nowMs;
+                      let timeLeftPercent = totalDuration > 0 ? (remainingMs / totalDuration) * 100 : 0;
+                      timeLeftPercent = Math.min(Math.max(timeLeftPercent, 0), 100);
+
                       return (
-                        <div 
+                        <motion.div 
                           key={order.id}
                           onClick={() => {
                             const el = document.getElementById(`order-card-${order.id}`);
@@ -1067,25 +1184,60 @@ export default function App() {
                               setTimeout(() => el.classList.remove('ring-2', 'ring-rose-500', 'ring-offset-2'), 4000);
                             }
                           }}
-                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all ${
+                          animate={{
+                            scale: [1, 1.01, 1],
+                            borderColor: isPast
+                              ? isDark ? ["rgba(239, 68, 68, 0.3)", "rgba(239, 68, 68, 0.55)", "rgba(239, 68, 68, 0.3)"] : ["rgba(239, 68, 68, 0.2)", "rgba(239, 68, 68, 0.45)", "rgba(239, 68, 68, 0.2)"]
+                              : isDark ? ["rgba(245, 158, 11, 0.3)", "rgba(245, 158, 11, 0.55)", "rgba(245, 158, 11, 0.3)"] : ["rgba(245, 158, 11, 0.2)", "rgba(245, 158, 11, 0.45)", "rgba(245, 158, 11, 0.2)"]
+                          }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className={`flex flex-col p-3.5 rounded-xl border cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md ${
                             isPast
-                              ? isDark ? "bg-rose-950/20 border-rose-500/30 text-rose-300" : "bg-rose-100 border-rose-200 text-rose-800"
-                              : isDark ? "bg-amber-950/20 border-amber-500/30 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-850"
+                              ? isDark ? "bg-rose-950/20 text-rose-300" : "bg-rose-100/95 text-rose-850"
+                              : isDark ? "bg-amber-950/20 text-amber-300" : "bg-amber-50/95 text-amber-850"
                           }`}
                         >
-                          <div className="flex flex-col text-right">
-                            <span className="text-xs font-bold font-sans">#{order.orderNumber} - {order.customerName}</span>
-                            <span className="text-[10px] opacity-80 mt-0.5">{diffText}</span>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-col text-right">
+                              <span className="text-xs font-extrabold font-sans">#{order.orderNumber} - {order.customerName}</span>
+                              <span className="text-[10px] opacity-90 mt-0.5 font-bold">{diffText}</span>
+                            </div>
+                            <div className="flex items-center gap-1 font-mono text-xs font-black shrink-0">
+                              <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                              <span>{timeStr}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5 font-mono text-xs font-bold shrink-0">
-                            <Clock className="h-3.5 w-3.5 text-cyan-400" />
-                            <span>{timeStr}</span>
+
+                          {/* Progress indicator */}
+                          <div className="w-full mt-3">
+                            <div className="flex justify-between items-center text-[9px] font-black opacity-85 mb-1.5">
+                              <span>שנותר: {Math.round(timeLeftPercent)}%</span>
+                              <span>זמן מתוכנן: {Math.round(totalDuration / 60000)} דק'</span>
+                            </div>
+                            <div className={`w-full h-1.5 rounded-full overflow-hidden p-[1px] ${
+                              isDark ? "bg-slate-950/70" : "bg-slate-200/80"
+                            }`}>
+                              <div 
+                                className={`h-full rounded-full transition-all duration-1000 ${
+                                  isPast 
+                                    ? "bg-rose-600 animate-pulse" 
+                                    : timeLeftPercent <= 30 
+                                      ? "bg-gradient-to-r from-red-500 to-amber-500" 
+                                      : "bg-gradient-to-r from-amber-500 to-emerald-500"
+                                }`} 
+                                style={{ width: `${timeLeftPercent}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
                   </div>
-                </div>
+                </motion.div>
               );
             })()}
           </>
@@ -1125,28 +1277,37 @@ export default function App() {
               </div>
 
               {/* Status Tabs */}
-              <div className={`flex border p-1 rounded-xl overflow-x-auto gap-0.5 ${
-                isDark ? "bg-slate-950 border-slate-850" : "bg-slate-100 border-slate-200"
-              }`}>
-                {["הכל", "ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח", "בוטל", "הוקפא"].map((tab) => (
-                  <button
-                    key={tab}
-                    id={`tab-${tab}`}
-                    onClick={() => setSelectedStatusTab(tab)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                      selectedStatusTab === tab
-                        ? isDark
-                          ? "bg-slate-900 text-cyan-400 border border-slate-800/80 shadow-inner"
-                          : "bg-white text-cyan-600 border border-slate-200 shadow-sm"
-                        : isDark
-                          ? "text-slate-400 hover:text-slate-200"
-                          : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    {tab === "הכל" ? "כל הסטטוסים" : tab}
-                  </button>
-                ))}
-              </div>
+              {dashboardView === "active" ? (
+                <div className={`flex border p-1 rounded-xl overflow-x-auto gap-0.5 ${
+                  isDark ? "bg-slate-950 border-slate-850" : "bg-slate-100 border-slate-200"
+                }`}>
+                  {["הכל", "ממתין להכנה", "בהכנה", "מוכן לאיסוף", "בוטל", "הוקפא"].map((tab) => (
+                    <button
+                      key={tab}
+                      id={`tab-${tab}`}
+                      onClick={() => setSelectedStatusTab(tab)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                        selectedStatusTab === tab
+                          ? isDark
+                            ? "bg-slate-900 text-cyan-400 border border-slate-800/80 shadow-inner"
+                            : "bg-white text-cyan-600 border border-slate-200 shadow-sm"
+                          : isDark
+                            ? "text-slate-400 hover:text-slate-200"
+                            : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {tab === "הכל" ? "כל הסטטוסים הפעילים" : tab}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className={`flex border p-2 rounded-xl text-xs font-black items-center gap-2 ${
+                  isDark ? "bg-purple-950/20 border-purple-900/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.05)]" : "bg-purple-50 border-purple-100 text-purple-700"
+                }`}>
+                  <span className="text-sm">🗄️</span>
+                  <span>מציג הזמנות שסופקו ונשלחו לארכיון בלבד</span>
+                </div>
+              )}
 
             </div>
 
