@@ -19,7 +19,7 @@ async function startServer() {
 
       if (targetUrl.includes("docs.google.com/spreadsheets")) {
         const match = targetUrl.match(/\/d\/([^\/]+)/);
-        if (match && match[1]) {
+        if (match && match[1] && match[1] !== "e") {
           spreadsheetId = match[1];
         }
       }

@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Clock, Plus, ClipboardList, Package } from "lucide-react";
+import { Clock, Plus, ClipboardList, Package, RefreshCw } from "lucide-react";
 
 interface HeaderProps {
   onOpenReportModal: () => void;
   onOpenAddOrderModal: () => void;
+  onSync: () => void;
+  isLoading: boolean;
 }
 
-export default function Header({ onOpenReportModal, onOpenAddOrderModal }: HeaderProps) {
+export default function Header({ onOpenReportModal, onOpenAddOrderModal, onSync, isLoading }: HeaderProps) {
   const [time, setTime] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -95,6 +97,16 @@ export default function Header({ onOpenReportModal, onOpenAddOrderModal }: Heade
 
           {/* Actions */}
           <div className="flex items-center gap-2.5">
+            <button
+              id="btn-sync-live"
+              onClick={onSync}
+              disabled={isLoading}
+              className={`flex items-center gap-2 rounded-xl text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border border-cyan-400/20 hover:border-cyan-300/30 px-4 py-2 text-xs font-bold shadow-lg shadow-cyan-500/10 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 ${isLoading ? "animate-pulse" : ""}`}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-cyan-100 ${isLoading ? "animate-spin" : ""}`} />
+              <span>🔄 סנכרון נתונים חי</span>
+            </button>
+
             <button
               id="btn-add-order"
               onClick={onOpenAddOrderModal}

@@ -221,7 +221,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState<string>(() => {
-    return localStorage.getItem("sabanos_sheet_url") || "";
+    return localStorage.getItem("sabanos_sheet_url") || "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZCXN68oVhbcihwRCNJp-XizIXXR2HLZWQrvXNJDJ74Hd0IkNY8SwSiFiFzgOAdQ0IW74fIrWPLp_y/pub?gid=0&single=true&output=csv";
   });
   const [showSettings, setShowSettings] = useState(false);
 
@@ -314,7 +314,7 @@ export default function App() {
     }
   };
 
-  // 1. Initial Load from localStorage and auto-sync
+  // 1. Initial Load from localStorage and auto-sync with the live Google Sheet
   useEffect(() => {
     let initialLoaded = false;
     try {
@@ -331,14 +331,16 @@ export default function App() {
     }
 
     if (!initialLoaded) {
-      setOrders(INITIAL_ORDERS);
-      localStorage.setItem("sabanos_orders", JSON.stringify(INITIAL_ORDERS));
+      setOrders([]);
+      localStorage.setItem("sabanos_orders", JSON.stringify([]));
     }
 
-    // Auto-sync on startup if URL is configured
-    const savedUrl = localStorage.getItem("sabanos_sheet_url") || "";
-    if (savedUrl && navigator.onLine) {
-      fetchDataFromSheet(savedUrl);
+    // Always fetch latest data from live sheetUrl on startup
+    const targetUrl = localStorage.getItem("sabanos_sheet_url") || "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZCXN68oVhbcihwRCNJp-XizIXXR2HLZWQrvXNJDJ74Hd0IkNY8SwSiFiFzgOAdQ0IW74fIrWPLp_y/pub?gid=0&single=true&output=csv";
+    if (navigator.onLine) {
+      fetchDataFromSheet(targetUrl);
+    } else {
+      showNotification("עובד במצב אופליין - מציג נתונים שמורים בלבד", "info");
     }
   }, []);
 
@@ -748,6 +750,8 @@ export default function App() {
           setEditingOrder(null);
           setIsFormOpen(true);
         }}
+        onSync={() => fetchDataFromSheet()}
+        isLoading={isLoading}
       />
 
       {/* Main Content Dashboard Layout */}
@@ -903,17 +907,6 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleResetDemoData}
-                className={`px-3 py-1.5 text-[11px] font-bold border rounded-xl transition-all cursor-pointer ${
-                  isDark
-                    ? "text-slate-500 hover:text-slate-300 bg-slate-950 hover:bg-slate-900 border-slate-850"
-                    : "text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border-slate-200 shadow-sm"
-                }`}
-              >
-                איפוס נתוני הדגמה
-              </button>
-
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1083,40 +1076,38 @@ export default function App() {
         {isLoading && orders.length === 0 ? (
           <div className={`flex flex-col items-center justify-center p-20 rounded-2xl border ${
             isDark ? "bg-slate-900/20 border-slate-850" : "bg-white border-slate-200 shadow-sm"
-          } text-center`}>
-            <div className="relative flex h-16 w-16 items-center justify-center mb-4">
-              <div className="absolute h-12 w-12 rounded-full border-4 border-cyan-500/20 border-t-cyan-500 animate-spin" />
-              <RefreshCw className="h-6 w-6 text-cyan-500 animate-spin" />
+          } text-center relative overflow-hidden`}>
+            {/* Glowing cyan neon background aura */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+            
+            <div className="relative flex h-24 w-24 items-center justify-center mb-6">
+              {/* Pulsing neon outer rings */}
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/10 animate-ping opacity-25" style={{ animationDuration: '3s' }} />
+              <div className="absolute -inset-2 rounded-full border border-cyan-400/20 shadow-[0_0_15px_rgba(34,211,238,0.2)] animate-pulse" />
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.15)]" />
+              <div className="absolute inset-0 rounded-full border-4 border-t-cyan-400 border-r-transparent border-b-transparent border-l-transparent animate-spin shadow-[0_0_15px_rgba(34,211,238,0.5)]" style={{ animationDuration: '0.8s' }} />
+              <RefreshCw className="h-8 w-8 text-cyan-400 animate-spin" style={{ animationDuration: '2s' }} />
             </div>
-            <h3 className={`text-base font-bold ${isDark ? "text-slate-200" : "text-slate-700"}`}>טוען נתונים מגוגל שיטס...</h3>
-            <p className="text-xs text-slate-500 mt-1">אנא המתן בזמן שהמערכת מושכת את הזמנות 'לוג_הזמנות_מערכת'</p>
+            <h3 className={`text-lg font-bold tracking-wide ${isDark ? "text-slate-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.3)]" : "text-slate-800"}`}>
+              טוען נתונים מתוך גיליון 'לוג_הזמנות_מערכת'...
+            </h3>
+            <p className="text-xs text-slate-500 mt-2 font-mono">אנא המתן בזמן שהמערכת מושכת ומסנכרנת את ההזמנות בזמן אמת</p>
           </div>
         ) : fetchError && orders.length === 0 ? (
           <div className={`flex flex-col items-center justify-center p-12 rounded-2xl border text-center max-w-md mx-auto ${
-            isDark ? "bg-slate-900/20 border-slate-850 text-slate-200" : "bg-white border-slate-200 shadow-sm text-slate-700"
+            isDark ? "bg-slate-900/20 border-rose-500/20 text-slate-200" : "bg-white border-rose-200 shadow-sm text-slate-700"
           }`}>
-            <div className="h-14 w-14 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20 text-rose-500 mb-4 animate-bounce">
-              <Info className="h-7 w-7" />
+            <div className="h-16 w-16 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/30 text-rose-500 mb-4 animate-pulse">
+              <Info className="h-8 w-8" />
             </div>
-            <h3 className="text-base font-bold">סנכרון הנתונים נכשל</h3>
+            <h3 className="text-base font-bold text-rose-500">חיבור לגיליון 'לוג_הזמנות_מערכת' נכשל</h3>
             <p className="text-xs text-slate-400 mt-2 leading-relaxed">{fetchError}</p>
             <div className="flex items-center gap-3 mt-6">
               <button
                 onClick={() => fetchDataFromSheet()}
-                className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-bold rounded-xl transition-all hover:scale-[1.02] cursor-pointer"
+                className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 transition-all cursor-pointer"
               >
-                נסה שוב
-              </button>
-              <button
-                onClick={() => {
-                  updateOrdersState(INITIAL_ORDERS);
-                  setFetchError(null);
-                }}
-                className={`px-4 py-2 text-xs font-semibold rounded-xl border ${
-                  isDark ? "bg-slate-950 border-slate-800 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-600"
-                }`}
-              >
-                טען נתוני הדגמה
+                🔄 סנכרון נתונים חי
               </button>
             </div>
           </div>
