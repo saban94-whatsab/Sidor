@@ -1,5 +1,5 @@
 import { Order, OrderStatus, STATUS_OPTIONS } from "../types";
-import { Calendar, Hash, User, MapPin, Phone, FileText, Edit, Trash2, ExternalLink, Tag, MessageSquare } from "lucide-react";
+import { Calendar, Hash, User, MapPin, Phone, FileText, Edit, Trash2, ExternalLink, Tag, MessageSquare, Clock, Bell } from "lucide-react";
 
 interface OrderCardProps {
   order: Order;
@@ -78,6 +78,60 @@ export default function OrderCard({
     }
   };
 
+  // Deadline & Reminder Calculations
+  const getDeadlineState = () => {
+    if (!order.deadlineTime) return null;
+    
+    try {
+      const deadlineDate = new Date(order.deadlineTime);
+      if (isNaN(deadlineDate.getTime())) return null;
+      
+      const now = new Date();
+      const diffMs = deadlineDate.getTime() - now.getTime();
+      const diffMins = Math.round(diffMs / 60000);
+      const isPast = diffMins < 0;
+      const absoluteMins = Math.abs(diffMins);
+      const reminderMinutes = order.reminderMinutes ?? 30;
+      const isUrgent = diffMins <= reminderMinutes; // Trigger warning when within reminder window
+      
+      let timeText = "";
+      if (isPast) {
+        const hours = Math.floor(absoluteMins / 60);
+        const mins = absoluteMins % 60;
+        if (hours > 0) {
+          timeText = `איחור של ${hours} שעות ו-${mins} דק'`;
+        } else {
+          timeText = `איחור של ${mins} דק'`;
+        }
+      } else {
+        const hours = Math.floor(absoluteMins / 60);
+        const mins = absoluteMins % 60;
+        if (hours > 0) {
+          timeText = `נשארו ${hours} שעות ו-${mins} דק'`;
+        } else {
+          timeText = `נשארו ${mins} דק'`;
+        }
+      }
+
+      // Format target time nicely as HH:mm
+      const targetTimeStr = order.deadlineTime.includes("T") 
+        ? order.deadlineTime.split("T")[1].substring(0, 5) 
+        : order.deadlineTime;
+
+      return {
+        isPast,
+        isUrgent,
+        timeText,
+        targetTimeStr,
+        diffMins,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const deadlineState = order.status !== "נשלח" ? getDeadlineState() : null;
+
   return (
     <div
       id={`order-card-${order.id}`}
@@ -153,6 +207,30 @@ export default function OrderCard({
           </div>
         </div>
       </div>
+
+      {/* Deadline Alert Banner */}
+      {deadlineState && (
+        <div id={`order-deadline-alert-${order.id}`} className={`mt-3 p-2.5 rounded-xl border flex items-center justify-between relative z-10 ${
+          deadlineState.isPast
+            ? "border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)] animate-pulse"
+            : deadlineState.isUrgent
+              ? "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse"
+              : theme === "dark" 
+                ? "border-slate-800 bg-slate-950/40 text-slate-300" 
+                : "border-slate-200 bg-slate-50 text-slate-600"
+        }`}>
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full ${
+              deadlineState.isPast ? "bg-rose-500" : deadlineState.isUrgent ? "bg-amber-500" : "bg-cyan-400"
+            } ${deadlineState.isUrgent || deadlineState.isPast ? "animate-ping" : ""}`} />
+            <span className="text-xs font-bold font-mono text-right">{deadlineState.timeText}</span>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] opacity-90">
+            <Clock className="h-3.5 w-3.5 text-cyan-400" />
+            <span>יעד: {deadlineState.targetTimeStr}</span>
+          </div>
+        </div>
+      )}
 
       {/* Card Body: Customer details & Address */}
       <div className="py-4 flex flex-col gap-3.5 relative z-10 text-right">

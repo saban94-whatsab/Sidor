@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Order, OrderStatus, STATUS_OPTIONS } from "../types";
-import { X, Save, FileText, Calendar, Hash, User, MapPin, Phone, HelpCircle, History } from "lucide-react";
+import { X, Save, FileText, Calendar, Hash, User, MapPin, Phone, HelpCircle, History, Clock, Bell } from "lucide-react";
 
 interface OrderFormModalProps {
   isOpen: boolean;
@@ -18,6 +18,8 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
   const [items, setItems] = useState("");
   const [status, setStatus] = useState<OrderStatus>("ממתין להכנה");
   const [notes, setNotes] = useState("");
+  const [deadlineTime, setDeadlineTime] = useState("");
+  const [reminderMinutes, setReminderMinutes] = useState<number>(30);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -32,6 +34,17 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
       setItems(editingOrder.items);
       setStatus(editingOrder.status);
       setNotes(editingOrder.notes || "");
+      
+      if (editingOrder.deadlineTime) {
+        if (editingOrder.deadlineTime.includes("T")) {
+          setDeadlineTime(editingOrder.deadlineTime.split("T")[1].substring(0, 5));
+        } else {
+          setDeadlineTime(editingOrder.deadlineTime);
+        }
+      } else {
+        setDeadlineTime("");
+      }
+      setReminderMinutes(editingOrder.reminderMinutes ?? 30);
     } else {
       // Set default date to tomorrow
       const tomorrow = new Date();
@@ -50,6 +63,8 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
       setItems("");
       setStatus("ממתין להכנה");
       setNotes("");
+      setDeadlineTime("");
+      setReminderMinutes(30);
     }
     setErrors({});
   }, [editingOrder, isOpen]);
@@ -82,7 +97,9 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
       contactPerson,
       items,
       status,
-      notes: notes.trim() || undefined
+      notes: notes.trim() || undefined,
+      deadlineTime: deadlineTime ? `${date}T${deadlineTime}` : undefined,
+      reminderMinutes: deadlineTime ? Number(reminderMinutes) : undefined
     });
     
     onClose();
@@ -255,6 +272,46 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
                 className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all"
                 placeholder="דחוף לפרוק עם מנוף..."
               />
+            </div>
+          </div>
+
+          {/* Deadline & Reminder Settings */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-800/60 pt-4">
+            {/* Deadline Time */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                <span>שעת יעד למסירה (דדליין):</span>
+              </label>
+              <input
+                type="time"
+                value={deadlineTime}
+                onChange={(e) => setDeadlineTime(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all font-mono"
+              />
+              <span className="text-[10px] text-slate-500">הזן שעה לביצוע המסירה ביום המיועד</span>
+            </div>
+
+            {/* Reminder Minutes */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Bell className="h-3.5 w-3.5 text-cyan-400" />
+                <span>התראה לפני הדדליין:</span>
+              </label>
+              <select
+                value={reminderMinutes}
+                onChange={(e) => setReminderMinutes(Number(e.target.value))}
+                disabled={!deadlineTime}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <option value={10}>10 דקות לפני</option>
+                <option value={15}>15 דקות לפני</option>
+                <option value={30}>30 דקות לפני</option>
+                <option value={45}>45 דקות לפני</option>
+                <option value={60}>שעה אחת לפני</option>
+                <option value={120}>שעתיים לפני</option>
+              </select>
+              <span className="text-[10px] text-slate-500">בחרו מתי להציג התראה ויזואלית בלוח</span>
             </div>
           </div>
 

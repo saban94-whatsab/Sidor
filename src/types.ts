@@ -23,6 +23,8 @@ export interface Order {
   status: OrderStatus;
   notes?: string;
   statusLog?: StatusLogEntry[];
+  deadlineTime?: string; // Format: YYYY-MM-DDTHH:mm or HH:mm
+  reminderMinutes?: number; // Minutes before deadline to show a warning
 }
 
 export const STATUS_OPTIONS: OrderStatus[] = [

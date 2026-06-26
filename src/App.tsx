@@ -9,7 +9,7 @@ import NoteModal from "./components/NoteModal";
 import { INITIAL_ORDERS } from "./data";
 import { Order, OrderStatus, parseItemsText, getFormattedTimestamp, mapCsvToOrders } from "./types";
 import { playNotificationSound } from "./utils/audio";
-import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Trash2, ArrowUpDown, Shield, Wifi, WifiOff, Moon, Sun, Settings, Link } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Trash2, ArrowUpDown, Shield, Wifi, WifiOff, Moon, Sun, Settings, Link, Clock } from "lucide-react";
 
 export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -211,6 +211,10 @@ export default function App() {
   const [notification, setNotification] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Keep track of notified order IDs to avoid duplicate alerts
+  const warnedApproachingRef = useRef<Record<string, boolean>>({});
+  const warnedOverdueRef = useRef<Record<string, boolean>>({});
+
   // ----------------------------------------------------
   // PWA & Google Sheets States
   // ----------------------------------------------------
@@ -274,13 +278,63 @@ export default function App() {
       }
 
       const targetUrl = urlToFetch.trim();
-      const proxyUrl = `/api/fetch-sheet?url=${encodeURIComponent(targetUrl)}`;
-      const res = await fetch(proxyUrl);
-      if (!res.ok) {
-        throw new Error("נכשל בטעינת הקובץ. אנא וודא שהגיליון פורסם לרשת כקובץ CSV, או פתוח לצפייה לכל מי שיש לו את הקישור.");
+      let csvText = "";
+      let success = false;
+
+      // 1. First, try the local API proxy (which handles CORS and parses normal URLs to CSV)
+      try {
+        const proxyUrl = `/api/fetch-sheet?url=${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          csvText = await res.text();
+          success = true;
+        } else {
+          console.warn(`Proxy fetch failed with status: ${res.status}`);
+        }
+      } catch (e) {
+        console.warn("Proxy fetch failed, trying direct client-side fetch...", e);
       }
 
-      const csvText = await res.text();
+      // 2. Fallback: try fetching directly (works perfectly for published CSVs, which the user's URL is!)
+      if (!success) {
+        try {
+          console.log(`Trying direct client fetch for: ${targetUrl}`);
+          const res = await fetch(targetUrl);
+          if (res.ok) {
+            csvText = await res.text();
+            success = true;
+          } else {
+            throw new Error(`Direct fetch status: ${res.status}`);
+          }
+        } catch (e: any) {
+          console.error("Direct fetch failed too:", e);
+          
+          // Let's also check if the URL is a standard Google Sheet viewer link and can be reformatted
+          let reformattedUrl = targetUrl;
+          if (targetUrl.includes("docs.google.com/spreadsheets")) {
+            const match = targetUrl.match(/\/d\/([^\/]+)/);
+            if (match && match[1] && match[1] !== "e") {
+              const spreadsheetId = match[1];
+              reformattedUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv`;
+              try {
+                console.log(`Trying reformatted export fetch: ${reformattedUrl}`);
+                const res = await fetch(reformattedUrl);
+                if (res.ok) {
+                  csvText = await res.text();
+                  success = true;
+                }
+              } catch (errExport) {
+                console.error("Reformatted export fetch failed:", errExport);
+              }
+            }
+          }
+          
+          if (!success) {
+            throw new Error("נכשל בטעינת הקובץ. אנא וודא שהגיליון פורסם לרשת כקובץ CSV, או פתוח לצפייה לכל מי שיש לו את הקישור.");
+          }
+        }
+      }
+
       const sheetOrders = mapCsvToOrders(csvText);
 
       if (sheetOrders.length === 0) {
@@ -343,6 +397,48 @@ export default function App() {
       showNotification("עובד במצב אופליין - מציג נתונים שמורים בלבד", "info");
     }
   }, []);
+
+  // Check deadlines every 10 seconds and trigger alerts / plays sound
+  useEffect(() => {
+    const checkDeadlines = () => {
+      const now = new Date();
+      orders.forEach(order => {
+        if (!order.deadlineTime || order.status === "נשלח") return;
+        
+        try {
+          const deadlineDate = new Date(order.deadlineTime);
+          if (isNaN(deadlineDate.getTime())) return;
+          
+          const diffMs = deadlineDate.getTime() - now.getTime();
+          const diffMins = Math.round(diffMs / 60000);
+          const reminderMinutes = order.reminderMinutes ?? 30;
+          
+          // 1. Overdue Alert
+          if (diffMins <= 0) {
+            if (!warnedOverdueRef.current[order.id]) {
+              warnedOverdueRef.current[order.id] = true;
+              showNotification(`⚠️ דחוף: פג תוקף זמן היעד של הזמנה #${order.orderNumber} (${order.customerName})`, "error");
+              playNotificationSound();
+            }
+          }
+          // 2. Approaching Alert
+          else if (diffMins <= reminderMinutes) {
+            if (!warnedApproachingRef.current[order.id]) {
+              warnedApproachingRef.current[order.id] = true;
+              showNotification(`⏰ התראה: הזמנה #${order.orderNumber} מתקרבת לזמן היעד (${diffMins} דקות נותרו!)`, "info");
+              playNotificationSound();
+            }
+          }
+        } catch (e) {
+          console.error("Error checking deadline:", e);
+        }
+      });
+    };
+
+    checkDeadlines();
+    const interval = setInterval(checkDeadlines, 10000);
+    return () => clearInterval(interval);
+  }, [orders]);
 
   // Toggle theme helper
   const toggleTheme = () => {
@@ -774,6 +870,91 @@ export default function App() {
 
         {/* Analytics Dashboard Visualizer Component */}
         <OrderDashboard orders={orders} theme={theme} />
+
+        {/* Deadlines Alert Center */}
+        {(() => {
+          const urgentOrOverdueOrders = orders.filter(order => {
+            if (!order.deadlineTime || order.status === "נשלח") return false;
+            try {
+              const deadlineDate = new Date(order.deadlineTime);
+              if (isNaN(deadlineDate.getTime())) return false;
+              const diffMs = deadlineDate.getTime() - new Date().getTime();
+              const diffMins = Math.round(diffMs / 60000);
+              const reminderMinutes = order.reminderMinutes ?? 30;
+              return diffMins <= reminderMinutes;
+            } catch {
+              return false;
+            }
+          });
+
+          if (urgentOrOverdueOrders.length === 0) return null;
+
+          return (
+            <div id="deadlines-alert-center" className={`w-full p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
+              isDark 
+                ? "border-rose-500/20 bg-gradient-to-br from-slate-900/80 to-rose-950/10" 
+                : "border-rose-200 bg-rose-50/50 shadow-sm text-slate-800"
+            }`} dir="rtl">
+              <div className="absolute top-0 right-0 h-[2px] w-full bg-gradient-to-l from-rose-500 via-amber-500 to-transparent pointer-events-none" />
+              <div className="flex items-center gap-3 mb-3 text-right">
+                <span className="text-xl animate-bounce">🚨</span>
+                <div>
+                  <h3 className="text-sm font-bold text-rose-500">מרכז התראות: דדליינים דחופים</h3>
+                  <p className="text-[11px] text-slate-400">ההזמנות הבאות קרובות לשעת היעד או עברו אותה. אנא ודא אספקה מיידית!</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {urgentOrOverdueOrders.map(order => {
+                  const deadlineDate = new Date(order.deadlineTime!);
+                  const diffMins = Math.round((deadlineDate.getTime() - new Date().getTime()) / 60000);
+                  const isPast = diffMins < 0;
+                  const absoluteMins = Math.abs(diffMins);
+                  const timeStr = order.deadlineTime!.includes("T") ? order.deadlineTime!.split("T")[1].substring(0, 5) : order.deadlineTime!;
+
+                  let diffText = "";
+                  if (isPast) {
+                    const h = Math.floor(absoluteMins / 60);
+                    const m = absoluteMins % 60;
+                    diffText = h > 0 ? `באיחור של ${h} ש' ו-${m} דק'` : `באיחור של ${m} דק'`;
+                  } else {
+                    const h = Math.floor(absoluteMins / 60);
+                    const m = absoluteMins % 60;
+                    diffText = h > 0 ? `נותרו עוד ${h} ש' ו-${m} דק'` : `נותרו עוד ${m} דק'`;
+                  }
+
+                  return (
+                    <div 
+                      key={order.id}
+                      onClick={() => {
+                        const el = document.getElementById(`order-card-${order.id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          el.classList.add('ring-2', 'ring-rose-500', 'ring-offset-2');
+                          setTimeout(() => el.classList.remove('ring-2', 'ring-rose-500', 'ring-offset-2'), 4000);
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all ${
+                        isPast
+                          ? isDark ? "bg-rose-950/20 border-rose-500/30 text-rose-300" : "bg-rose-100 border-rose-200 text-rose-800"
+                          : isDark ? "bg-amber-950/20 border-amber-500/30 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-850"
+                      }`}
+                    >
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs font-bold font-sans">#{order.orderNumber} - {order.customerName}</span>
+                        <span className="text-[10px] opacity-80 mt-0.5">{diffText}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-mono text-xs font-bold shrink-0">
+                        <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                        <span>{timeStr}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Filter Controls Row */}
         <div className={`w-full flex flex-col gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
