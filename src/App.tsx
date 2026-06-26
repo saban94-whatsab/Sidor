@@ -273,18 +273,11 @@ export default function App() {
         throw new Error("אין חיבור רשת. לא ניתן לסנכרן עם גוגל שיטס כעת.");
       }
 
-      let targetUrl = urlToFetch.trim();
-      // Auto-convert shareable view link to published CSV link
-      if (targetUrl.includes("docs.google.com/spreadsheets") && !targetUrl.includes("output=csv")) {
-        const match = targetUrl.match(/\/d\/([^\/]+)/);
-        if (match && match[1]) {
-          targetUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/pub?output=csv`;
-        }
-      }
-
-      const res = await fetch(targetUrl);
+      const targetUrl = urlToFetch.trim();
+      const proxyUrl = `/api/fetch-sheet?url=${encodeURIComponent(targetUrl)}`;
+      const res = await fetch(proxyUrl);
       if (!res.ok) {
-        throw new Error("נכשל בטעינת הקובץ. אנא וודא שהגיליון פורסם לרשת כקובץ CSV.");
+        throw new Error("נכשל בטעינת הקובץ. אנא וודא שהגיליון פורסם לרשת כקובץ CSV, או פתוח לצפייה לכל מי שיש לו את הקישור.");
       }
 
       const csvText = await res.text();
