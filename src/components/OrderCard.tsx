@@ -11,6 +11,8 @@ interface OrderCardProps {
   onSelectChange?: (orderId: string, isSelected: boolean) => void;
   theme?: "dark" | "light";
   key?: string;
+  onSendLoadingCommand?: (order: Order) => void;
+  onSendDeliveryUpdate?: (order: Order) => void;
 }
 
 export default function OrderCard({
@@ -21,7 +23,9 @@ export default function OrderCard({
   onAddNote,
   isSelected = false,
   onSelectChange,
-  theme = "dark"
+  theme = "dark",
+  onSendLoadingCommand,
+  onSendDeliveryUpdate
 }: OrderCardProps) {
   
   // Custom classes depending on status
@@ -240,6 +244,39 @@ export default function OrderCard({
           </div>
         </div>
       )}
+
+      {/* WhatsApp Smart Actions */}
+      <div className={`mt-4 pt-3.5 border-t grid grid-cols-2 gap-3.5 relative z-10 ${
+        theme === "dark" ? "border-slate-800/40" : "border-slate-150"
+      }`}>
+        <button
+          id={`btn-loading-cmd-${order.id}`}
+          onClick={() => onSendLoadingCommand?.(order)}
+          className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-md border ${
+            theme === "dark"
+              ? "bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/25 text-sky-400 shadow-[0_0_15px_rgba(14,165,233,0.1)] hover:shadow-[0_0_20px_rgba(14,165,233,0.15)] hover:border-sky-500/40"
+              : "bg-sky-50 hover:bg-sky-100/80 border-sky-200 text-sky-700 shadow-sm"
+          }`}
+          title="שלח פקודת העמסה לנהג בווצאפ"
+        >
+          <span className="text-sm">🚚</span>
+          <span>פקודת העמסה</span>
+        </button>
+
+        <button
+          id={`btn-delivery-update-${order.id}`}
+          onClick={() => onSendDeliveryUpdate?.(order)}
+          className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-md border ${
+            theme === "dark"
+              ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-500/40"
+              : "bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200 text-emerald-700 shadow-sm"
+          }`}
+          title="שלח עדכון אספקה ללקוח בווצאפ"
+        >
+          <span className="text-sm">📍</span>
+          <span>עדכון אספקה</span>
+        </button>
+      </div>
 
       {/* Card Actions: Edit, Note & Delete */}
       <div className={`mt-5 pt-3 border-t flex items-center justify-between relative z-10 ${

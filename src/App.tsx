@@ -13,6 +13,182 @@ import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Tra
 
 export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
+  
+  // ----------------------------------------------------
+  // WhatsApp Smart Routing & Audit Log States
+  // ----------------------------------------------------
+  const [auditLogs, setAuditLogs] = useState<{
+    id: string;
+    timestamp: string;
+    orderNumber: string;
+    customerName: string;
+    action: string;
+    recipient: string;
+  }[]>(() => {
+    try {
+      const stored = localStorage.getItem("sabanos_audit_logs");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [whatsappSelectorData, setWhatsappSelectorData] = useState<{
+    order: Order;
+    type: "loading" | "delivery";
+    customerPhone: string;
+    selectedRecipientType: "customer" | "driver_hikmat" | "driver_ali" | "custom";
+    customPhone: string;
+  } | null>(null);
+
+  const addAuditLog = (orderNumber: string, customerName: string, action: string, recipient: string) => {
+    const newEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: getFormattedTimestamp(),
+      orderNumber,
+      customerName,
+      action,
+      recipient
+    };
+    const updated = [newEntry, ...auditLogs].slice(0, 100);
+    setAuditLogs(updated);
+    localStorage.setItem("sabanos_audit_logs", JSON.stringify(updated));
+  };
+
+  const extractPhone = (text: string): string => {
+    if (!text) return "";
+    const cleaned = text.replace(/[-\s]/g, "");
+    const match = cleaned.match(/(?:\+972|0)?5\d{8}/);
+    if (match) {
+      let num = match[0];
+      if (num.startsWith("0")) {
+        num = "972" + num.slice(1);
+      } else if (!num.startsWith("+") && !num.startsWith("972")) {
+        num = "972" + num;
+      }
+      return num.startsWith("+") ? num : "+" + num;
+    }
+    return "";
+  };
+
+  const generateLoadingText = (order: Order) => {
+    const sep = "━━━━━━━━━━━━━━━━━━";
+    let text = `*פקודת העמסה להזמנה #${order.orderNumber}* 🚚\n`;
+    text += `${sep}\n`;
+    text += `*לקוח:* ${order.customerName}\n`;
+    text += `*כתובת אספקה:* ${order.deliveryAddress}\n`;
+    if (order.contactPerson) {
+      text += `*איש קשר:* ${order.contactPerson}\n`;
+    }
+    text += `${sep}\n`;
+    text += `*פריטים להעמסה:*\n`;
+    order.parsedItems.forEach(item => {
+      const skuStr = item.sku ? `[${item.sku}] ` : "";
+      text += `• ${skuStr}${item.name} - כמות: *${item.quantity}* יח'\n`;
+    });
+    text += `${sep}\n`;
+    if (order.notes) {
+      text += `*הערה מיוחדת:* ${order.notes}\n`;
+      text += `${sep}\n`;
+    }
+    text += `תודה ועבודה בטוחה! 🏗️`;
+    return text;
+  };
+
+  const generateDeliveryText = (order: Order) => {
+    let text = `*עדכון אספקה להזמנה #${order.orderNumber}* 📍\n\n`;
+    text += `שלום *${order.customerName}*,\n`;
+    text += `ההזמנה שלך מוכנה ויצאה לדרך עם משאית מנוף! 🚚💨\n\n`;
+    text += `*כתובת למשלוח:* ${order.deliveryAddress}\n\n`;
+    text += `*פירוט הפריטים במשלוח:*\n`;
+    order.parsedItems.forEach(item => {
+      text += `• ${item.name} - כמות: ${item.quantity} יח'\n`;
+    });
+    text += `\nנשמח לעמוד לשירותך,\n`;
+    text += `סבנוס חומרי בניין בע"מ 🏗️`;
+    return text;
+  };
+
+  const getWhatsAppUrl = (phone: string, text: string) => {
+    const cleanPhone = phone.replace(/[^\d]/g, "").trim();
+    const encodedText = encodeURIComponent(text);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      return `https://wa.me/${cleanPhone}?text=${encodedText}`;
+    } else {
+      return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    }
+  };
+
+  const executeSendWhatsApp = (order: Order, type: "loading" | "delivery", phone: string, recipientName: string) => {
+    const text = type === "loading" ? generateLoadingText(order) : generateDeliveryText(order);
+    const url = getWhatsAppUrl(phone, text);
+    const targetStatus: OrderStatus = type === "loading" ? "בהכנה" : "נשלח";
+    const timestamp = getFormattedTimestamp();
+
+    const updated = orders.map(o => {
+      if (o.id === order.id) {
+        const existingLog = o.statusLog || [];
+        return {
+          ...o,
+          status: targetStatus,
+          statusLog: [...existingLog, { status: targetStatus, timestamp }]
+        };
+      }
+      return o;
+    });
+    updateOrdersState(updated);
+
+    const actionText = type === "loading"
+      ? "שלח פקודת העמסה (בהכנה)"
+      : "שלח עדכון אספקה (נשלח)";
+    addAuditLog(order.orderNumber, order.customerName, actionText, `${recipientName} (${phone})`);
+    showNotification(`ההודעה מוכנה למשלוח בווצאפ! סטטוס ההזמנה עודכן ל"${targetStatus}"`, "success");
+    window.open(url, "_blank");
+  };
+
+  const handleSendLoadingCommand = (order: Order) => {
+    const fields = [order.customerName, order.contactPerson, order.deliveryAddress].map(f => f || "");
+    const matchesHokmat = fields.some(f => f.includes("חכמת"));
+    const matchesAli = fields.some(f => f.includes("עלי"));
+
+    if (matchesHokmat) {
+      executeSendWhatsApp(order, "loading", "+972532316985", "חכמת גאבר (נהג)");
+    } else if (matchesAli) {
+      executeSendWhatsApp(order, "loading", "+972542276631", "עלי נהג (נהג)");
+    } else {
+      const extracted = extractPhone(order.contactPerson || "");
+      setWhatsappSelectorData({
+        order,
+        type: "loading",
+        customerPhone: extracted,
+        selectedRecipientType: "driver_hikmat",
+        customPhone: ""
+      });
+    }
+  };
+
+  const handleSendDeliveryUpdate = (order: Order) => {
+    const fields = [order.customerName, order.contactPerson, order.deliveryAddress].map(f => f || "");
+    const matchesHokmat = fields.some(f => f.includes("חכמת"));
+    const matchesAli = fields.some(f => f.includes("עלי"));
+
+    if (matchesHokmat) {
+      executeSendWhatsApp(order, "delivery", "+972532316985", "חכמת גאבר (נהג)");
+    } else if (matchesAli) {
+      executeSendWhatsApp(order, "delivery", "+972542276631", "עלי נהג (נהג)");
+    } else {
+      const extracted = extractPhone(order.contactPerson || "");
+      setWhatsappSelectorData({
+        order,
+        type: "delivery",
+        customerPhone: extracted,
+        selectedRecipientType: extracted ? "customer" : "driver_hikmat",
+        customPhone: ""
+      });
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatusTab, setSelectedStatusTab] = useState<string>("הכל");
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>("הכל");
@@ -981,11 +1157,89 @@ export default function App() {
                   isSelected={selectedOrderIds.includes(order.id)}
                   onSelectChange={handleSelectOrder}
                   theme={theme}
+                  onSendLoadingCommand={handleSendLoadingCommand}
+                  onSendDeliveryUpdate={handleSendDeliveryUpdate}
                 />
               ))}
             </div>
           )
         )}
+
+        {/* System Audit Log Section */}
+        <div className={`mt-8 w-full p-5 md:p-6 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
+          isDark 
+            ? "border-slate-800/85 bg-gradient-to-br from-slate-900/40 to-slate-950/60" 
+            : "border-slate-200/80 bg-white shadow-sm"
+        }`}>
+          {isDark && (
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent pointer-events-none" />
+          )}
+
+          <div className="flex items-center justify-between gap-3 pb-4 border-b mb-4 border-slate-800/20">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">📋</span>
+              <div className="text-right">
+                <h3 className="font-bold text-sm tracking-wide">יומן פעולות מערכת (System Audit Log)</h3>
+                <p className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>תיעוד שינויי סטטוס ושילוחים בזמן אמת</p>
+              </div>
+            </div>
+            {auditLogs.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm("האם ברצונך למחוק את היסטוריית הפעולות?")) {
+                    setAuditLogs([]);
+                    localStorage.removeItem("sabanos_audit_logs");
+                  }
+                }}
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 ${
+                  isDark ? "border-slate-800 text-slate-500 bg-slate-950/40" : "border-slate-250 text-slate-455 bg-slate-50"
+                }`}
+              >
+                נקה יומן
+              </button>
+            )}
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <div className={`text-center py-6 text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              אין פעולות מוקלטות ביומן כעת. לחץ על כפתורי הווצאפ בכרטיסי ההזמנה כדי להתחיל.
+            </div>
+          ) : (
+            <div className="max-h-[220px] overflow-y-auto space-y-2.5 pr-0.5" id="audit-log-list">
+              {auditLogs.map((log) => (
+                <div 
+                  key={log.id} 
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border text-right text-xs transition-all ${
+                    isDark 
+                      ? "bg-slate-950/50 border-slate-900/60 hover:bg-slate-950/80" 
+                      : "bg-slate-50/60 border-slate-150 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-sm mt-0.5">🟢</span>
+                    <div className="flex flex-col">
+                      <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                        <span className="text-cyan-400 font-mono">#{log.orderNumber}</span>
+                        <span className={isDark ? "text-slate-300" : "text-slate-700"}>{log.customerName}</span>
+                        <span className="text-slate-500 font-normal">|</span>
+                        <span className={log.action.includes("העמסה") ? "text-sky-400" : "text-emerald-400"}>
+                          {log.action}
+                        </span>
+                      </div>
+                      <div className={`text-[10px] mt-0.5 flex items-center gap-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        <span className="font-semibold">נמען:</span>
+                        <span className="font-mono bg-slate-950/20 px-1 rounded">{log.recipient}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`text-[10px] font-mono shrink-0 text-left ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                    {log.timestamp}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
       </main>
 
@@ -1139,6 +1393,175 @@ export default function App() {
         initialNote={noteOrder?.notes || ""}
         onSave={handleSaveNote}
       />
+
+      {/* Contact Selector Fallback Picker Modal */}
+      {whatsappSelectorData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm text-right font-sans" dir="rtl" id="contact-selector-modal">
+          <div className={`w-full max-w-md p-6 rounded-2xl border shadow-2xl transition-colors duration-300 ${
+            isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800"
+          }`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-green-500/10 text-green-400 flex items-center justify-center text-lg">
+                💬
+              </div>
+              <div>
+                <h3 className="font-bold text-base">בחר נמען למשלוח ווצאפ</h3>
+                <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  {whatsappSelectorData.type === "loading" ? "פקודת העמסה להזמנה" : "עדכון אספקה להזמנה"} #{whatsappSelectorData.order.orderNumber}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 mb-5">
+              {/* Option 1: Customer (if phone is extracted) */}
+              {whatsappSelectorData.customerPhone ? (
+                <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  whatsappSelectorData.selectedRecipientType === "customer"
+                    ? isDark ? "border-green-500/60 bg-green-950/15 text-green-400" : "border-green-400 bg-green-50/50 text-green-700"
+                    : isDark ? "border-slate-800 bg-slate-950/55 hover:bg-slate-950" : "border-slate-200 bg-slate-50 hover:bg-slate-100/50"
+                }`}>
+                  <input
+                    type="radio"
+                    name="recipient-type"
+                    checked={whatsappSelectorData.selectedRecipientType === "customer"}
+                    onChange={() => setWhatsappSelectorData({ ...whatsappSelectorData, selectedRecipientType: "customer" })}
+                    className="h-4.5 w-4.5 text-green-500 focus:ring-green-500/30 accent-green-500"
+                  />
+                  <div className="flex flex-col text-right">
+                    <span className="font-bold text-xs">איש קשר מההזמנה (לקוח)</span>
+                    <span className="text-[10px] font-mono text-slate-400 mt-0.5">{whatsappSelectorData.order.contactPerson} ({whatsappSelectorData.customerPhone})</span>
+                  </div>
+                </label>
+              ) : (
+                <div className={`p-3 rounded-xl border text-[11px] leading-relaxed text-right ${isDark ? "bg-slate-950/40 border-slate-900 text-slate-500" : "bg-slate-50 border-slate-150 text-slate-400"}`}>
+                  ⚠️ לא זוהה מספר טלפון תקין של הלקוח בפרטי איש הקשר ("{whatsappSelectorData.order.contactPerson || "ריק"}"). תוכל להזין מספר מותאם אישית למטה או לשלוח לאחד הנהגים.
+                </div>
+              )}
+
+              {/* Option 2: Hikmat (Driver) */}
+              <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                whatsappSelectorData.selectedRecipientType === "driver_hikmat"
+                  ? isDark ? "border-green-500/60 bg-green-950/15 text-green-400" : "border-green-400 bg-green-50/50 text-green-700"
+                  : isDark ? "border-slate-800 bg-slate-950/55 hover:bg-slate-950" : "border-slate-200 bg-slate-50 hover:bg-slate-100/50"
+              }`}>
+                <input
+                  type="radio"
+                  name="recipient-type"
+                  checked={whatsappSelectorData.selectedRecipientType === "driver_hikmat"}
+                  onChange={() => setWhatsappSelectorData({ ...whatsappSelectorData, selectedRecipientType: "driver_hikmat" })}
+                  className="h-4.5 w-4.5 text-green-500 focus:ring-green-500/30 accent-green-500"
+                />
+                <div className="flex flex-col text-right">
+                  <span className="font-bold text-xs">🚚 חכמת גאבר (נהג מורשה)</span>
+                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">+972532316985</span>
+                </div>
+              </label>
+
+              {/* Option 3: Ali (Driver) */}
+              <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                whatsappSelectorData.selectedRecipientType === "driver_ali"
+                  ? isDark ? "border-green-500/60 bg-green-950/15 text-green-400" : "border-green-400 bg-green-50/50 text-green-700"
+                  : isDark ? "border-slate-800 bg-slate-950/55 hover:bg-slate-950" : "border-slate-200 bg-slate-50 hover:bg-slate-100/50"
+              }`}>
+                <input
+                  type="radio"
+                  name="recipient-type"
+                  checked={whatsappSelectorData.selectedRecipientType === "driver_ali"}
+                  onChange={() => setWhatsappSelectorData({ ...whatsappSelectorData, selectedRecipientType: "driver_ali" })}
+                  className="h-4.5 w-4.5 text-green-500 focus:ring-green-500/30 accent-green-500"
+                />
+                <div className="flex flex-col text-right">
+                  <span className="font-bold text-xs">🚚 עלי נהג (נהג מורשה)</span>
+                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">+972542276631</span>
+                </div>
+              </label>
+
+              {/* Option 4: Custom */}
+              <div className={`p-3.5 rounded-xl border flex flex-col gap-2 ${
+                whatsappSelectorData.selectedRecipientType === "custom"
+                  ? isDark ? "border-green-500/60 bg-green-950/15 text-green-400" : "border-green-400 bg-green-50/50 text-green-700"
+                  : isDark ? "border-slate-800 bg-slate-950/55 hover:bg-slate-950" : "border-slate-200 bg-slate-50 hover:bg-slate-100/50"
+              }`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="recipient-type"
+                    checked={whatsappSelectorData.selectedRecipientType === "custom"}
+                    onChange={() => setWhatsappSelectorData({ ...whatsappSelectorData, selectedRecipientType: "custom" })}
+                    className="h-4.5 w-4.5 text-green-500 focus:ring-green-500/30 accent-green-500"
+                  />
+                  <span className="font-bold text-xs text-right">✍️ מספר מותאם אישית</span>
+                </label>
+                {whatsappSelectorData.selectedRecipientType === "custom" && (
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={whatsappSelectorData.customPhone}
+                    onChange={(e) => setWhatsappSelectorData({ ...whatsappSelectorData, customPhone: e.target.value })}
+                    className={`w-full text-xs font-mono p-2.5 rounded-xl border mt-1 text-left focus:outline-none focus:ring-1 focus:ring-green-500 ${
+                      isDark ? "bg-slate-950 border-slate-850 text-white" : "bg-white border-slate-200 text-slate-800"
+                    }`}
+                    placeholder="050-1234567"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => {
+                  let finalPhone = "";
+                  let recipientName = "";
+                  
+                  if (whatsappSelectorData.selectedRecipientType === "customer") {
+                    finalPhone = whatsappSelectorData.customerPhone;
+                    recipientName = whatsappSelectorData.order.customerName;
+                  } else if (whatsappSelectorData.selectedRecipientType === "driver_hikmat") {
+                    finalPhone = "+972532316985";
+                    recipientName = "חכמת גאבר (נהג)";
+                  } else if (whatsappSelectorData.selectedRecipientType === "driver_ali") {
+                    finalPhone = "+972542276631";
+                    recipientName = "עלי נהג (נהג)";
+                  } else if (whatsappSelectorData.selectedRecipientType === "custom") {
+                    let cleaned = whatsappSelectorData.customPhone.replace(/[-\s]/g, "");
+                    if (!cleaned) {
+                      showNotification("אנא הזן מספר טלפון תקין", "error");
+                      return;
+                    }
+                    if (cleaned.startsWith("0")) {
+                      cleaned = "972" + cleaned.slice(1);
+                    }
+                    if (!cleaned.startsWith("+") && !cleaned.startsWith("972")) {
+                      cleaned = "972" + cleaned;
+                    }
+                    finalPhone = cleaned.startsWith("+") ? cleaned : "+" + cleaned;
+                    recipientName = `מספר ידני (${finalPhone})`;
+                  }
+
+                  if (!finalPhone) {
+                    showNotification("לא נבחר נמען תקין", "error");
+                    return;
+                  }
+
+                  executeSendWhatsApp(whatsappSelectorData.order, whatsappSelectorData.type, finalPhone, recipientName);
+                  setWhatsappSelectorData(null);
+                }}
+                className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-green-500/15"
+              >
+                שגר לווצאפ 🚀
+              </button>
+              <button
+                onClick={() => setWhatsappSelectorData(null)}
+                className={`px-4 py-2.5 text-xs font-semibold rounded-xl border cursor-pointer ${
+                  isDark ? "bg-slate-950 border-slate-800 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-600"
+                }`}
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
