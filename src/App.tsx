@@ -9,10 +9,11 @@ import OrderFormModal from "./components/OrderFormModal";
 import ReportModal from "./components/ReportModal";
 import NoteModal from "./components/NoteModal";
 import OrderStatusHistoryModal from "./components/OrderStatusHistoryModal";
+import WhatsAppSummaryModal from "./components/WhatsAppSummaryModal";
 import { INITIAL_ORDERS } from "./data";
 import { Order, OrderStatus, parseItemsText, getFormattedTimestamp, mapCsvToOrders } from "./types";
 import { playNotificationSound } from "./utils/audio";
-import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Trash2, ArrowUpDown, Shield, Wifi, WifiOff, Moon, Sun, Settings, Link, Clock, Maximize2, Minimize2, Package, Plus } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Trash2, ArrowUpDown, Shield, Wifi, WifiOff, Moon, Sun, Settings, Link, Clock, Maximize2, Minimize2, Package, Plus, MessageCircle } from "lucide-react";
 
 export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -202,6 +203,7 @@ export default function App() {
   
   // Modals state
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isWhatsAppSummaryOpen, setIsWhatsAppSummaryOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [noteOrder, setNoteOrder] = useState<Order | null>(null);
@@ -452,6 +454,51 @@ export default function App() {
     const interval = setInterval(checkDeadlines, 10000);
     return () => clearInterval(interval);
   }, [orders]);
+
+  // Keyboard Shortcuts (Alt+N: Add order, Alt+S: Sync, Alt+F: Toggle full-screen)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore shortcuts when user is typing in inputs or textareas
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (
+        activeTag === "input" || 
+        activeTag === "textarea" || 
+        document.activeElement?.hasAttribute("contenteditable")
+      ) {
+        return;
+      }
+
+      if (event.altKey) {
+        // Alt + N: New Order
+        if (event.code === "KeyN" || event.key.toLowerCase() === "n" || event.key === "מ") {
+          event.preventDefault();
+          setEditingOrder(null);
+          setIsFormOpen(true);
+          showNotification("קיצור דרך: פתיחת טופס הזמנה חדשה", "info");
+        }
+        // Alt + S: Sync
+        else if (event.code === "KeyS" || event.key.toLowerCase() === "s" || event.key === "ד") {
+          event.preventDefault();
+          fetchDataFromSheet();
+          showNotification("קיצור דרך: התחלת סנכרון נתונים", "info");
+        }
+        // Alt + F: Fullscreen Toggle
+        else if (event.code === "KeyF" || event.key.toLowerCase() === "f" || event.key === "כ") {
+          event.preventDefault();
+          setIsFullScreen(prev => {
+            const next = !prev;
+            showNotification(next ? "קיצור דרך: כניסה למצב מסך מלא" : "קיצור דרך: יציאה ממצב מסך מלא", "info");
+            return next;
+          });
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [fetchDataFromSheet, isFullScreen]);
 
   // Toggle theme helper
   const toggleTheme = () => {
@@ -1208,6 +1255,18 @@ export default function App() {
                 <Download className="h-3.5 w-3.5 text-teal-500" />
                 <span>ייצא ל-CSV</span>
               </button>
+
+              <button
+                onClick={() => setIsWhatsAppSummaryOpen(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold border rounded-xl transition-all cursor-pointer ${
+                  isDark
+                    ? "text-slate-400 hover:text-slate-200 bg-slate-950 hover:bg-slate-900 border-slate-850"
+                    : "text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border-slate-200 shadow-sm"
+                }`}
+              >
+                <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
+                <span>סיכום יומי ל-WhatsApp</span>
+              </button>
             </div>
           </div>
 
@@ -1644,6 +1703,27 @@ export default function App() {
                 />
               </div>
 
+              {/* Keyboard Shortcuts Info Section */}
+              <div className={`p-3 rounded-xl border ${
+                isDark ? "bg-slate-950/40 border-slate-850" : "bg-slate-50 border-slate-200"
+              }`}>
+                <span className="font-bold text-[11px] block mb-2 text-cyan-500">⌨️ קיצורי דרך במקלדת (מהירים):</span>
+                <div className="grid grid-cols-1 gap-1.5 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>הוספת הזמנה חדשה:</span>
+                    <kbd className="font-mono bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-1.5 py-0.2 rounded font-bold">Alt + N</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>סנכרון נתונים:</span>
+                    <kbd className="font-mono bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-1.5 py-0.2 rounded font-bold">Alt + S</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={isDark ? "text-slate-400" : "text-slate-500"}>מעבר למסך מלא:</span>
+                    <kbd className="font-mono bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-1.5 py-0.2 rounded font-bold">Alt + F</kbd>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 pt-2">
                 <button
                   onClick={() => {
@@ -1697,6 +1777,13 @@ export default function App() {
         isOpen={historyOrder !== null}
         onClose={() => setHistoryOrder(null)}
         order={historyOrder}
+        theme={theme}
+      />
+
+      <WhatsAppSummaryModal
+        isOpen={isWhatsAppSummaryOpen}
+        onClose={() => setIsWhatsAppSummaryOpen(false)}
+        orders={orders}
         theme={theme}
       />
 
