@@ -36,7 +36,9 @@ export default function OrderDashboard({ orders, theme = "dark" }: OrderDashboar
       "ממתין להכנה": 0,
       "בהכנה": 0,
       "מוכן לאיסוף": 0,
-      "נשלח": 0
+      "נשלח": 0,
+      "בוטל": 0,
+      "הוקפא": 0
     }
   );
 
@@ -44,7 +46,9 @@ export default function OrderDashboard({ orders, theme = "dark" }: OrderDashboar
     "ממתין להכנה": "#f59e0b", // Amber 500
     "בהכנה": "#06b6d4",     // Cyan 500
     "מוכן לאיסוף": "#10b981", // Emerald 500
-    "נשלח": "#a855f7"       // Purple 500
+    "נשלח": "#a855f7",       // Purple 500
+    "בוטל": "#f43f5e",       // Rose 500
+    "הוקפא": "#3b82f6"       // Blue 500
   };
 
   const statusPieData = Object.entries(statusCounts)

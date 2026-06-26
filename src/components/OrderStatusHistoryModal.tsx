@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Calendar, Clock, ArrowLeft, CheckCircle2, Play, Hourglass, Send, Activity, ShieldAlert } from "lucide-react";
+import { X, Calendar, Clock, ArrowLeft, CheckCircle2, Play, Hourglass, Send, Activity, ShieldAlert, XCircle, AlertCircle } from "lucide-react";
 import { Order, OrderStatus } from "../types";
 import { motion } from "motion/react";
 
@@ -72,6 +72,26 @@ export default function OrderStatusHistoryModal({
           dotColor: "bg-purple-500",
           glowColor: "shadow-[0_0_10px_rgba(168,85,247,0.5)]",
           description: "ההזמנה נמסרה לנהג ויצאה לדרך אל היעד"
+        };
+      case "בוטל":
+        return {
+          icon: <XCircle className="h-4.5 w-4.5" />,
+          bgColor: isDark ? "bg-rose-500/10" : "bg-rose-50",
+          borderColor: isDark ? "border-rose-500/30" : "border-rose-250",
+          textColor: "text-rose-400",
+          dotColor: "bg-rose-500",
+          glowColor: "shadow-[0_0_10px_rgba(244,63,94,0.5)]",
+          description: "ההזמנה בוטלה ואינה פעילה יותר"
+        };
+      case "הוקפא":
+        return {
+          icon: <AlertCircle className="h-4.5 w-4.5" />,
+          bgColor: isDark ? "bg-sky-500/10" : "bg-sky-50",
+          borderColor: isDark ? "border-sky-500/30" : "border-sky-250",
+          textColor: "text-sky-400",
+          dotColor: "bg-sky-400",
+          glowColor: "shadow-[0_0_10px_rgba(14,165,233,0.5)]",
+          description: "ההזמנה הוקפאה באופן זמני עד להוראה חדשה"
         };
       default:
         return {

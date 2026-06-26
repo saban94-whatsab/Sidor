@@ -745,7 +745,7 @@ export default function App() {
 
           // Map to correct status option or default to "ממתין להכנה"
           let finalStatus: OrderStatus = "ממתין להכנה";
-          if (["ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח"].includes(csvStatus)) {
+          if (["ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח", "בוטל", "הוקפא"].includes(csvStatus)) {
             finalStatus = csvStatus as OrderStatus;
           }
 
@@ -1128,7 +1128,7 @@ export default function App() {
               <div className={`flex border p-1 rounded-xl overflow-x-auto gap-0.5 ${
                 isDark ? "bg-slate-950 border-slate-850" : "bg-slate-100 border-slate-200"
               }`}>
-                {["הכל", "ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח"].map((tab) => (
+                {["הכל", "ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח", "בוטל", "הוקפא"].map((tab) => (
                   <button
                     key={tab}
                     id={`tab-${tab}`}
@@ -1304,7 +1304,7 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-[11px] font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>עדכון סטטוס קבוצתי:</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {(["ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח"] as OrderStatus[]).map((status) => (
+                  {(["ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח", "בוטל", "הוקפא"] as OrderStatus[]).map((status) => (
                     <button
                       key={status}
                       onClick={() => handleBulkStatusChange(status)}

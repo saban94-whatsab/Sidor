@@ -1,5 +1,5 @@
 import { Order } from "../types";
-import { Clipboard, Play, CheckCircle2, Truck, BarChart3 } from "lucide-react";
+import { Clipboard, Play, CheckCircle2, Truck, BarChart3, XCircle, AlertCircle } from "lucide-react";
 
 interface OrderStatsProps {
   orders: Order[];
@@ -12,6 +12,8 @@ export default function OrderStats({ orders, theme = "dark" }: OrderStatsProps) 
   const inPrep = orders.filter(o => o.status === "בהכנה").length;
   const ready = orders.filter(o => o.status === "מוכן לאיסוף").length;
   const sent = orders.filter(o => o.status === "נשלח").length;
+  const cancelled = orders.filter(o => o.status === "בוטל").length;
+  const frozen = orders.filter(o => o.status === "הוקפא").length;
 
   const isDark = theme === "dark";
 
@@ -70,11 +72,33 @@ export default function OrderStats({ orders, theme = "dark" }: OrderStatsProps) 
         : "text-purple-600 bg-white border-slate-200/80 hover:border-purple-500/30 shadow-sm",
       glowColor: isDark ? "hover:shadow-purple-500/10" : "hover:shadow-purple-300/5",
       accent: "bg-purple-500/10 text-purple-500"
+    },
+    {
+      id: "stat-cancelled",
+      label: "בוטל",
+      value: cancelled,
+      icon: XCircle,
+      colorClass: isDark
+        ? "text-rose-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-rose-500/30"
+        : "text-rose-600 bg-white border-slate-200/80 hover:border-rose-500/30 shadow-sm",
+      glowColor: isDark ? "hover:shadow-rose-500/10" : "hover:shadow-rose-300/5",
+      accent: "bg-rose-500/10 text-rose-500"
+    },
+    {
+      id: "stat-frozen",
+      label: "הוקפא",
+      value: frozen,
+      icon: AlertCircle,
+      colorClass: isDark
+        ? "text-sky-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-sky-500/30"
+        : "text-sky-600 bg-white border-slate-200/80 hover:border-sky-500/30 shadow-sm",
+      glowColor: isDark ? "hover:shadow-sky-500/10" : "hover:shadow-sky-300/5",
+      accent: "bg-sky-500/10 text-sky-500"
     }
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 w-full" id="order-stats-grid">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 md:gap-4 w-full" id="order-stats-grid">
       {stats.map(stat => {
         const Icon = stat.icon;
         return (

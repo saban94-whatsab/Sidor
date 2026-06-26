@@ -206,7 +206,7 @@ export default function ReportModal({ isOpen, onClose, orders }: ReportModalProp
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-slate-300">הכלל סטטוסים בסידור:</span>
               <div className="flex flex-wrap gap-2">
-                {(["ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח"] as OrderStatus[]).map(status => {
+                {(["ממתין להכנה", "בהכנה", "מוכן לאיסוף", "נשלח", "בוטל", "הוקפא"] as OrderStatus[]).map(status => {
                   const isChecked = selectedStatuses.includes(status);
                   return (
                     <button

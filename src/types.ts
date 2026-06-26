@@ -1,4 +1,4 @@
-export type OrderStatus = "ממתין להכנה" | "בהכנה" | "מוכן לאיסוף" | "נשלח";
+export type OrderStatus = "ממתין להכנה" | "בהכנה" | "מוכן לאיסוף" | "נשלח" | "בוטל" | "הוקפא";
 
 export interface OrderItem {
   quantity: number;
@@ -31,7 +31,9 @@ export const STATUS_OPTIONS: OrderStatus[] = [
   "ממתין להכנה",
   "בהכנה",
   "מוכן לאיסוף",
-  "נשלח"
+  "נשלח",
+  "בוטל",
+  "הוקפא"
 ];
 
 // Helper to parse raw items string to structured OrderItem array

@@ -150,6 +150,10 @@ export default function OrderCard({
         return "ring-4 ring-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.6)] scale-105 rotate-1 animate-pulse bg-emerald-500/20 text-emerald-300";
       case "נשלח":
         return "ring-4 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.6)] scale-105 -rotate-1 animate-pulse bg-purple-500/20 text-purple-300";
+      case "בוטל":
+        return "ring-4 ring-rose-500/50 shadow-[0_0_20px_rgba(244,63,94,0.6)] scale-105 rotate-1 animate-pulse bg-rose-500/20 text-rose-300";
+      case "הוקפא":
+        return "ring-4 ring-sky-500/50 shadow-[0_0_20px_rgba(14,165,233,0.6)] scale-105 -rotate-1 animate-pulse bg-sky-500/20 text-sky-300";
       default:
         return "scale-105 animate-pulse";
     }
@@ -185,6 +189,20 @@ export default function OrderCard({
           border: "border-slate-800 hover:border-purple-500/40",
           glow: "from-purple-500/5 to-transparent",
           accentText: "text-purple-400"
+        };
+      case "בוטל":
+        return {
+          badge: "bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]",
+          border: "border-slate-800 hover:border-rose-500/40",
+          glow: "from-rose-500/5 to-transparent",
+          accentText: "text-rose-400"
+        };
+      case "הוקפא":
+        return {
+          badge: "bg-sky-500/10 text-sky-400 border border-sky-500/20 shadow-[0_0_10px_rgba(14,165,233,0.15)]",
+          border: "border-slate-800 hover:border-sky-500/40",
+          glow: "from-sky-500/5 to-transparent",
+          accentText: "text-sky-400"
         };
     }
   };
