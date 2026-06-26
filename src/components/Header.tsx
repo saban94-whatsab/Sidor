@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Clock, Plus, ClipboardList, Package, RefreshCw } from "lucide-react";
+import { Clock, Plus, ClipboardList, Package, RefreshCw, Zap } from "lucide-react";
 
 interface HeaderProps {
   onOpenReportModal: () => void;
@@ -97,6 +97,16 @@ export default function Header({ onOpenReportModal, onOpenAddOrderModal, onSync,
 
           {/* Actions */}
           <div className="flex items-center gap-2.5">
+            <button
+              id="btn-quick-actions"
+              onClick={onOpenReportModal}
+              className="relative overflow-hidden group flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-white px-4 py-2 text-xs font-bold shadow-lg shadow-orange-500/20 border border-orange-400/30 hover:border-orange-300/40 transition-all active:scale-[0.98] cursor-pointer"
+              title="פעולות מהירות - דוח בוקר מיידי"
+            >
+              <Zap className="h-3.5 w-3.5 text-amber-100 animate-pulse group-hover:scale-110 duration-200" />
+              <span>⚡ פעולות מהירות</span>
+            </button>
+
             <button
               id="btn-sync-live"
               onClick={onSync}
