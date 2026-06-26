@@ -9,6 +9,7 @@ interface OrderCardProps {
   onAddNote: (orderId: string) => void;
   isSelected?: boolean;
   onSelectChange?: (orderId: string, isSelected: boolean) => void;
+  theme?: "dark" | "light";
   key?: string;
 }
 
@@ -19,7 +20,8 @@ export default function OrderCard({
   onDelete,
   onAddNote,
   isSelected = false,
-  onSelectChange
+  onSelectChange,
+  theme = "dark"
 }: OrderCardProps) {
   
   // Custom classes depending on status
@@ -76,10 +78,14 @@ export default function OrderCard({
     <div
       id={`order-card-${order.id}`}
       className={`relative flex flex-col justify-between rounded-2xl border ${
-        isSelected
-          ? "border-cyan-500/60 bg-gradient-to-br from-slate-900/80 to-cyan-950/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-          : "border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40"
-      } p-5 md:p-6 transition-all duration-300 ease-out shadow-xl ${config.border} hover:shadow-2xl hover:scale-[1.02] hover:-translate-y-1 hover:shadow-slate-950/60 group overflow-hidden`}
+        theme === "light"
+          ? isSelected
+            ? "border-cyan-500 bg-cyan-50/30 shadow-[0_4px_15px_rgba(6,182,212,0.1)]"
+            : "border-slate-200/80 bg-white"
+          : isSelected
+            ? "border-cyan-500/60 bg-gradient-to-br from-slate-900/80 to-cyan-950/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+            : "border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40"
+      } p-5 md:p-6 transition-all duration-300 ease-out shadow-xl ${config.border} hover:shadow-2xl hover:scale-[1.02] hover:-translate-y-1 ${theme === "dark" ? "hover:shadow-slate-950/60" : "hover:shadow-slate-200/50"} group overflow-hidden`}
     >
       {/* Top linear highlight line */}
       <div className={`absolute top-0 left-0 right-0 h-[1.5px] ${
@@ -90,7 +96,7 @@ export default function OrderCard({
       <div className={`absolute -top-24 -right-24 h-48 w-48 rounded-full bg-gradient-to-br ${config.glow} blur-2xl opacity-40 pointer-events-none`} />
 
       {/* Card Header: Order # and Status Selection */}
-      <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-800/50 relative z-10">
+      <div className={`flex items-start justify-between gap-3 pb-4 border-b ${theme === "dark" ? "border-slate-800/50" : "border-slate-100"} relative z-10`}>
         <div className="flex items-center gap-3">
           {onSelectChange && (
             <div className="flex items-center justify-center pt-0.5">
@@ -99,11 +105,13 @@ export default function OrderCard({
                 id={`checkbox-${order.id}`}
                 checked={isSelected}
                 onChange={(e) => onSelectChange(order.id, e.target.checked)}
-                className="h-4.5 w-4.5 rounded-lg border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500/30 focus:ring-offset-slate-900 transition-all cursor-pointer accent-cyan-500"
+                className={`h-4.5 w-4.5 rounded-lg text-cyan-500 focus:ring-cyan-500/30 transition-all cursor-pointer accent-cyan-500 ${
+                  theme === "dark" ? "border-slate-700 bg-slate-950 focus:ring-offset-slate-900" : "border-slate-300 bg-white"
+                }`}
               />
             </div>
           )}
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-950 border border-slate-850">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${theme === "dark" ? "bg-slate-950 border border-slate-850" : "bg-slate-50 border border-slate-200"}`}>
             <Hash className="h-4 w-4 text-cyan-400" />
           </div>
           <div className="flex flex-col text-right">
@@ -123,10 +131,12 @@ export default function OrderCard({
             id={`status-select-${order.id}`}
             value={order.status}
             onChange={(e) => onStatusChange(order.id, e.target.value as OrderStatus)}
-            className={`appearance-none rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-md focus:outline-none focus:ring-1 focus:ring-slate-700 pl-8 pr-3 text-right cursor-pointer ${config.badge}`}
+            className={`appearance-none rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-md focus:outline-none focus:ring-1 focus:ring-slate-400 pl-8 pr-3 text-right cursor-pointer ${config.badge} ${
+              theme === "dark" ? "border-slate-800" : "border-slate-200"
+            }`}
           >
             {STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status} className="bg-slate-950 text-slate-200 py-1 font-sans">
+              <option key={status} value={status} className={`${theme === "dark" ? "bg-slate-950 text-slate-200" : "bg-white text-slate-800"} py-1 font-sans`}>
                 {status}
               </option>
             ))}
@@ -147,7 +157,7 @@ export default function OrderCard({
           <User className="h-4 w-4 text-slate-500 mt-1 shrink-0" />
           <div className="flex flex-col">
             <span className="text-[10px] text-slate-500 font-semibold leading-none mb-1">לקוח</span>
-            <span className="text-sm font-bold text-slate-100">{order.customerName}</span>
+            <span className={`text-sm font-bold ${theme === "dark" ? "text-slate-100" : "text-slate-800"}`}>{order.customerName}</span>
           </div>
         </div>
 
@@ -157,7 +167,7 @@ export default function OrderCard({
           <div className="flex flex-col w-full">
             <span className="text-[10px] text-slate-500 font-semibold leading-none mb-1">כתובת אספקה</span>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-300 font-medium leading-normal">{order.deliveryAddress}</span>
+              <span className={`text-xs font-medium leading-normal ${theme === "dark" ? "text-slate-300" : "text-slate-600"}`}>{order.deliveryAddress}</span>
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.deliveryAddress)}`}
                 target="_blank"
@@ -176,23 +186,29 @@ export default function OrderCard({
           <Phone className="h-4 w-4 text-slate-500 mt-1 shrink-0" />
           <div className="flex flex-col">
             <span className="text-[10px] text-slate-500 font-semibold leading-none mb-1">איש קשר וטלפון</span>
-            <span className="text-xs text-slate-300 font-medium">{order.contactPerson}</span>
+            <span className={`text-xs font-medium ${theme === "dark" ? "text-slate-300" : "text-slate-600"}`}>{order.contactPerson}</span>
           </div>
         </div>
       </div>
 
       {/* Card Products Area */}
-      <div className="mt-1 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/50 relative z-10 text-right">
-        <div className="flex items-center gap-1.5 pb-2 border-b border-slate-900 mb-2">
+      <div className={`mt-1 p-3.5 rounded-xl relative z-10 text-right border ${
+        theme === "dark" ? "bg-slate-950/60 border-slate-800/50" : "bg-slate-50/50 border-slate-150"
+      }`}>
+        <div className={`flex items-center gap-1.5 pb-2 border-b mb-2 ${theme === "dark" ? "border-slate-900" : "border-slate-150"}`}>
           <Tag className="h-3.5 w-3.5 text-cyan-400" />
           <span className="text-[11px] font-bold text-slate-400">מוצרים להכנה:</span>
         </div>
         <ul className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
           {order.parsedItems.map((item, idx) => (
-            <li key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-slate-900/20 last:border-b-0">
+            <li key={idx} className={`flex items-center justify-between text-xs py-0.5 border-b last:border-b-0 ${
+              theme === "dark" ? "border-slate-900/20" : "border-slate-100"
+            }`}>
               {/* Product Sku on left */}
               {item.sku ? (
-                <span className="font-mono text-[10px] bg-slate-900 text-slate-500 px-1.5 py-0.5 rounded border border-slate-850">
+                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
+                  theme === "dark" ? "bg-slate-900 text-slate-500 border-slate-850" : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}>
                   {item.sku}
                 </span>
               ) : (
@@ -200,8 +216,10 @@ export default function OrderCard({
               )}
               {/* Product name & quantity on right */}
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-200 font-medium">{item.name}</span>
-                <span className="font-mono text-cyan-400 font-bold bg-cyan-950/40 border border-cyan-500/15 px-1.5 py-0.2 rounded">
+                <span className={`font-medium ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`}>{item.name}</span>
+                <span className={`font-mono font-bold px-1.5 py-0.2 rounded border ${
+                  theme === "dark" ? "text-cyan-400 bg-cyan-950/40 border-cyan-500/15" : "text-cyan-600 bg-cyan-50 border-cyan-200/50"
+                }`}>
                   {item.quantity} יח'
                 </span>
               </div>
@@ -212,17 +230,21 @@ export default function OrderCard({
 
       {/* Notes / Special Instructions */}
       {order.notes && (
-        <div className="mt-3.5 flex items-start gap-2 text-right p-2.5 rounded-xl border border-amber-500/10 bg-amber-500/5 relative z-10">
+        <div className={`mt-3.5 flex items-start gap-2 text-right p-2.5 rounded-xl border relative z-10 ${
+          theme === "dark" ? "border-amber-500/10 bg-amber-500/5" : "border-amber-500/20 bg-amber-500/5"
+        }`}>
           <FileText className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
           <div className="flex flex-col">
             <span className="text-[9px] text-amber-500 font-bold uppercase tracking-wider">הערה מיוחדת:</span>
-            <p className="text-xs text-slate-300 leading-relaxed font-medium">{order.notes}</p>
+            <p className={`text-xs leading-relaxed font-medium ${theme === "dark" ? "text-slate-300" : "text-slate-700"}`}>{order.notes}</p>
           </div>
         </div>
       )}
 
       {/* Card Actions: Edit, Note & Delete */}
-      <div className="mt-5 pt-3 border-t border-slate-800/40 flex items-center justify-between relative z-10">
+      <div className={`mt-5 pt-3 border-t flex items-center justify-between relative z-10 ${
+        theme === "dark" ? "border-slate-800/40" : "border-slate-150"
+      }`}>
         <button
           id={`btn-delete-${order.id}`}
           onClick={() => onDelete(order.id)}

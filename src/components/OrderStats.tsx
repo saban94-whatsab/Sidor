@@ -3,14 +3,17 @@ import { Clipboard, Play, CheckCircle2, Truck, BarChart3 } from "lucide-react";
 
 interface OrderStatsProps {
   orders: Order[];
+  theme?: "dark" | "light";
 }
 
-export default function OrderStats({ orders }: OrderStatsProps) {
+export default function OrderStats({ orders, theme = "dark" }: OrderStatsProps) {
   const total = orders.length;
   const pending = orders.filter(o => o.status === "ממתין להכנה").length;
   const inPrep = orders.filter(o => o.status === "בהכנה").length;
   const ready = orders.filter(o => o.status === "מוכן לאיסוף").length;
   const sent = orders.filter(o => o.status === "נשלח").length;
+
+  const isDark = theme === "dark";
 
   const stats = [
     {
@@ -18,45 +21,55 @@ export default function OrderStats({ orders }: OrderStatsProps) {
       label: "סה\"כ הזמנות",
       value: total,
       icon: BarChart3,
-      colorClass: "text-slate-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-slate-700/80",
-      glowColor: "hover:shadow-slate-500/10",
-      accent: "bg-slate-500/10 text-slate-400"
+      colorClass: isDark
+        ? "text-slate-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-slate-700/80"
+        : "text-slate-600 bg-white border-slate-200/80 hover:border-slate-300 shadow-sm",
+      glowColor: isDark ? "hover:shadow-slate-500/10" : "hover:shadow-slate-300/5",
+      accent: isDark ? "bg-slate-500/10 text-slate-400" : "bg-slate-100 text-slate-500"
     },
     {
       id: "stat-pending",
       label: "ממתין להכנה",
       value: pending,
       icon: Clipboard,
-      colorClass: "text-amber-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-amber-500/30",
-      glowColor: "hover:shadow-amber-500/10",
-      accent: "bg-amber-500/10 text-amber-400"
+      colorClass: isDark
+        ? "text-amber-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-amber-500/30"
+        : "text-amber-600 bg-white border-slate-200/80 hover:border-amber-500/30 shadow-sm",
+      glowColor: isDark ? "hover:shadow-amber-500/10" : "hover:shadow-amber-300/5",
+      accent: "bg-amber-500/10 text-amber-500"
     },
     {
       id: "stat-in-prep",
       label: "בהכנה במחסן",
       value: inPrep,
       icon: Play,
-      colorClass: "text-cyan-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-cyan-500/30",
-      glowColor: "hover:shadow-cyan-500/10",
-      accent: "bg-cyan-500/10 text-cyan-400"
+      colorClass: isDark
+        ? "text-cyan-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-cyan-500/30"
+        : "text-cyan-600 bg-white border-slate-200/80 hover:border-cyan-500/30 shadow-sm",
+      glowColor: isDark ? "hover:shadow-cyan-500/10" : "hover:shadow-cyan-300/5",
+      accent: "bg-cyan-500/10 text-cyan-500"
     },
     {
       id: "stat-ready",
       label: "מוכן לאיסוף",
       value: ready,
       icon: CheckCircle2,
-      colorClass: "text-emerald-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-emerald-500/30",
-      glowColor: "hover:shadow-emerald-500/10",
-      accent: "bg-emerald-500/10 text-emerald-400"
+      colorClass: isDark
+        ? "text-emerald-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-emerald-500/30"
+        : "text-emerald-600 bg-white border-slate-200/80 hover:border-emerald-500/30 shadow-sm",
+      glowColor: isDark ? "hover:shadow-emerald-500/10" : "hover:shadow-emerald-300/5",
+      accent: "bg-emerald-500/10 text-emerald-500"
     },
     {
       id: "stat-sent",
       label: "נשלח ללקוח",
       value: sent,
       icon: Truck,
-      colorClass: "text-purple-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-purple-500/30",
-      glowColor: "hover:shadow-purple-500/10",
-      accent: "bg-purple-500/10 text-purple-400"
+      colorClass: isDark
+        ? "text-purple-400 bg-gradient-to-br from-slate-900/60 to-slate-950/40 border-slate-800/80 hover:border-purple-500/30"
+        : "text-purple-600 bg-white border-slate-200/80 hover:border-purple-500/30 shadow-sm",
+      glowColor: isDark ? "hover:shadow-purple-500/10" : "hover:shadow-purple-300/5",
+      accent: "bg-purple-500/10 text-purple-500"
     }
   ];
 
@@ -72,7 +85,7 @@ export default function OrderStats({ orders }: OrderStatsProps) {
           >
             {/* Top Row */}
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400">
+              <span className={`text-xs font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 {stat.label}
               </span>
               <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${stat.accent}`}>
@@ -82,10 +95,10 @@ export default function OrderStats({ orders }: OrderStatsProps) {
 
             {/* Bottom Row */}
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="font-mono text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+              <span className={`font-mono text-2xl md:text-3xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
                 {stat.value}
               </span>
-              <span className="text-[10px] text-slate-500 font-medium">פריטים</span>
+              <span className={`text-[10px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>הזמנות</span>
             </div>
 
             {/* Subtle glow border */}

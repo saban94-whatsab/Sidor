@@ -16,16 +16,18 @@ import { BarChart3, PieChart as PieIcon, Calendar, TrendingUp } from "lucide-rea
 
 interface OrderDashboardProps {
   orders: Order[];
+  theme?: "dark" | "light";
 }
 
-export default function OrderDashboard({ orders }: OrderDashboardProps) {
+export default function OrderDashboard({ orders, theme = "dark" }: OrderDashboardProps) {
+  const isDark = theme === "dark";
+
   // 1. Process Status Distribution Data
   const statusCounts = orders.reduce<Record<OrderStatus, number>>(
     (acc, order) => {
       if (order.status in acc) {
         acc[order.status]++;
       } else {
-        // Fallback or safety check (in case status is outside types, though TypeScript prevents it)
         acc[order.status] = 1;
       }
       return acc;
@@ -54,7 +56,6 @@ export default function OrderDashboard({ orders }: OrderDashboardProps) {
     .filter(d => d.value > 0); // Only show statuses with orders
 
   // 2. Process Orders per Day Data
-  // Sort dates chronologically
   const dateCounts = orders.reduce<Record<string, number>>((acc, order) => {
     const dateStr = order.date || "ללא תאריך";
     acc[dateStr] = (acc[dateStr] || 0) + 1;
@@ -82,16 +83,18 @@ export default function OrderDashboard({ orders }: OrderDashboardProps) {
     }))
     .sort((a, b) => a.rawDate.localeCompare(b.rawDate));
 
-  // Custom tooltips to match our dark glowing theme
+  // Custom tooltips
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-2xl text-right text-xs">
-          <p className="font-bold text-slate-100 mb-1">{data.name || data.dateLabel}</p>
+        <div className={`p-3 rounded-xl border shadow-2xl text-right text-xs ${
+          isDark ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-800"
+        }`}>
+          <p className="font-bold mb-1">{data.name || data.dateLabel}</p>
           <div className="flex items-center gap-2 justify-end">
-            <span className="font-mono text-cyan-400 font-extrabold">{payload[0].value}</span>
-            <span className="text-slate-400">הזמנות</span>
+            <span className={`font-mono font-extrabold ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>{payload[0].value}</span>
+            <span className={isDark ? "text-slate-400" : "text-slate-500"}>הזמנות</span>
           </div>
         </div>
       );
@@ -103,16 +106,20 @@ export default function OrderDashboard({ orders }: OrderDashboardProps) {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full" id="order-dashboard-container">
       
       {/* 1. Status Distribution Pie Chart Card */}
-      <div className="lg:col-span-5 flex flex-col rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40 p-5 md:p-6 shadow-xl relative overflow-hidden">
+      <div className={`lg:col-span-5 flex flex-col rounded-2xl border p-5 md:p-6 shadow-xl relative overflow-hidden ${
+        isDark ? "border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40" : "border-slate-200/80 bg-white"
+      }`}>
         {/* Border glow */}
         <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/15 to-transparent rounded-t-2xl" />
         
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/50">
+        <div className={`flex items-center justify-between mb-4 pb-3 border-b ${isDark ? "border-slate-800/50" : "border-slate-100"}`}>
           <div className="flex items-center gap-2">
             <PieIcon className="h-4.5 w-4.5 text-cyan-400" />
-            <h3 className="text-sm font-bold text-slate-100">התפלגות סטטוס הזמנות</h3>
+            <h3 className={`text-sm font-bold ${isDark ? "text-slate-100" : "text-slate-800"}`}>התפלגות סטטוס הזמנות</h3>
           </div>
-          <span className="text-[10px] font-mono text-slate-500 bg-slate-950/40 border border-slate-850 px-2 py-0.5 rounded-full">
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+            isDark ? "text-slate-500 bg-slate-950/40 border-slate-850" : "text-slate-500 bg-slate-50 border-slate-200"
+          }`}>
             יחס אחוזים
           </span>
         </div>
@@ -147,7 +154,7 @@ export default function OrderDashboard({ orders }: OrderDashboardProps) {
                   iconType="circle"
                   iconSize={8}
                   formatter={(value) => (
-                    <span className="text-[11px] font-bold text-slate-300 mr-1 ml-3 font-sans">{value}</span>
+                    <span className={`text-[11px] font-bold mr-1 ml-3 font-sans ${isDark ? "text-slate-300" : "text-slate-600"}`}>{value}</span>
                   )}
                 />
               </PieChart>
@@ -157,16 +164,20 @@ export default function OrderDashboard({ orders }: OrderDashboardProps) {
       </div>
 
       {/* 2. Orders per Day Bar Chart Card */}
-      <div className="lg:col-span-7 flex flex-col rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40 p-5 md:p-6 shadow-xl relative overflow-hidden">
+      <div className={`lg:col-span-7 flex flex-col rounded-2xl border p-5 md:p-6 shadow-xl relative overflow-hidden ${
+        isDark ? "border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40" : "border-slate-200/80 bg-white"
+      }`}>
         {/* Border glow */}
         <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/15 to-transparent rounded-t-2xl" />
 
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/50">
+        <div className={`flex items-center justify-between mb-4 pb-3 border-b ${isDark ? "border-slate-800/50" : "border-slate-100"}`}>
           <div className="flex items-center gap-2">
             <BarChart3 className="h-4.5 w-4.5 text-emerald-400" />
-            <h3 className="text-sm font-bold text-slate-100">קצב הזמנות יומי</h3>
+            <h3 className={`text-sm font-bold ${isDark ? "text-slate-100" : "text-slate-800"}`}>קצב הזמנות יומי</h3>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 bg-slate-950/40 border border-slate-850 px-2 py-0.5 rounded-full">
+          <div className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+            isDark ? "text-slate-500 bg-slate-950/40 border-slate-850" : "text-slate-500 bg-slate-50 border-slate-200"
+          }`}>
             <TrendingUp className="h-3 w-3 text-emerald-500" />
             <span>נפח עבודה</span>
           </div>
@@ -189,14 +200,14 @@ export default function OrderDashboard({ orders }: OrderDashboardProps) {
                 </defs>
                 <XAxis 
                   dataKey="dateLabel" 
-                  stroke="#475569" 
+                  stroke={isDark ? "#475569" : "#94a3b8"} 
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
                   dy={8}
                 />
                 <YAxis 
-                  stroke="#475569" 
+                  stroke={isDark ? "#475569" : "#94a3b8"} 
                   fontSize={10} 
                   tickLine={false}
                   axisLine={false}
