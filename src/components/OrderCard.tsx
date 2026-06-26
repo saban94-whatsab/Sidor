@@ -33,6 +33,7 @@ export default function OrderCard({
   const [prevStatus, setPrevStatus] = useState<OrderStatus>(order.status);
   const [isFlashing, setIsFlashing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isItemsExpanded, setIsItemsExpanded] = useState(false);
 
   useEffect(() => {
     if (order.status !== prevStatus) {
@@ -46,7 +47,7 @@ export default function OrderCard({
   }, [order.status, prevStatus]);
 
   useEffect(() => {
-    if (order.status === "בהכנה" && order.deadlineTime) {
+    if (order.deadlineTime && order.status !== "נשלח") {
       const interval = setInterval(() => {
         setCurrentTime(new Date());
       }, 1000); // update every second for live countdown precision
@@ -212,30 +213,37 @@ export default function OrderCard({
       const deadlineDate = new Date(order.deadlineTime);
       if (isNaN(deadlineDate.getTime())) return null;
       
-      const now = new Date();
+      const now = currentTime;
       const diffMs = deadlineDate.getTime() - now.getTime();
       const diffMins = Math.round(diffMs / 60000);
-      const isPast = diffMins < 0;
-      const absoluteMins = Math.abs(diffMins);
+      const isPast = diffMs < 0;
+      const absoluteMs = Math.abs(diffMs);
       const reminderMinutes = order.reminderMinutes ?? 30;
-      const isUrgent = diffMins <= reminderMinutes; // Trigger warning when within reminder window
+      const isUrgent = diffMs <= reminderMinutes * 60 * 1000; // Trigger warning when within reminder window
       
+      const totalSeconds = Math.floor(absoluteMs / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      let countdownStr = "";
+      if (hours > 0) {
+        countdownStr += `${String(hours).padStart(2, '0')}:`;
+      }
+      countdownStr += `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
       let timeText = "";
       if (isPast) {
-        const hours = Math.floor(absoluteMins / 60);
-        const mins = absoluteMins % 60;
         if (hours > 0) {
-          timeText = `איחור של ${hours} שעות ו-${mins} דק'`;
+          timeText = `איחור של ${hours} ש' ו-${minutes} דק'`;
         } else {
-          timeText = `איחור של ${mins} דק'`;
+          timeText = `איחור של ${minutes} דק'`;
         }
       } else {
-        const hours = Math.floor(absoluteMins / 60);
-        const mins = absoluteMins % 60;
         if (hours > 0) {
-          timeText = `נשארו ${hours} שעות ו-${mins} דק'`;
+          timeText = `בעוד ${hours} ש' ו-${minutes} דק'`;
         } else {
-          timeText = `נשארו ${mins} דק'`;
+          timeText = `בעוד ${minutes} דק'`;
         }
       }
 
@@ -248,8 +256,12 @@ export default function OrderCard({
         isPast,
         isUrgent,
         timeText,
+        countdownStr,
         targetTimeStr,
         diffMins,
+        hours,
+        minutes,
+        seconds
       };
     } catch {
       return null;
@@ -401,24 +413,52 @@ export default function OrderCard({
         </div>
       ) : (
         deadlineState && (
-          <div id={`order-deadline-alert-${order.id}`} className={`mt-3 p-2.5 rounded-xl border flex items-center justify-between relative z-10 ${
+          <div id={`order-deadline-alert-${order.id}`} className={`mt-3 p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 relative z-10 transition-all ${
             deadlineState.isPast
-              ? "border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)] animate-pulse"
+              ? "border-rose-500/35 bg-rose-500/10 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)] animate-pulse"
               : deadlineState.isUrgent
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse"
+                ? "border-amber-500/35 bg-amber-500/10 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                 : theme === "dark" 
                   ? "border-slate-800 bg-slate-950/40 text-slate-300" 
                   : "border-slate-200 bg-slate-50 text-slate-600"
           }`}>
-            <div className="flex items-center gap-2">
-              <div className={`h-2 w-2 rounded-full ${
-                deadlineState.isPast ? "bg-rose-500" : deadlineState.isUrgent ? "bg-amber-500" : "bg-cyan-400"
-              } ${deadlineState.isUrgent || deadlineState.isPast ? "animate-ping" : ""}`} />
-              <span className="text-xs font-bold font-mono text-right">{deadlineState.timeText}</span>
+            {/* Right side: Alert light and text description */}
+            <div className="flex items-center gap-2.5">
+              <div className="relative flex h-2 w-2 shrink-0">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  deadlineState.isPast ? "bg-rose-500" : deadlineState.isUrgent ? "bg-amber-400" : "bg-cyan-400"
+                }`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  deadlineState.isPast ? "bg-rose-500" : deadlineState.isUrgent ? "bg-amber-500" : "bg-cyan-400"
+                }`} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                {deadlineState.isUrgent && <Bell className="h-3.5 w-3.5 text-amber-500 animate-bounce shrink-0" />}
+                <span className="text-xs font-extrabold text-right leading-none">{deadlineState.timeText}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1 text-[11px] opacity-90">
-              <Clock className="h-3.5 w-3.5 text-cyan-400" />
-              <span>יעד: {deadlineState.targetTimeStr}</span>
+
+            {/* Left side: Live Countdown Timer & Target Time */}
+            <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800/10">
+              {/* Countdown Ticking numbers */}
+              <div className={`font-mono text-xs font-black tracking-wider flex items-center gap-0.5 px-2 py-0.5 rounded border ${
+                deadlineState.isPast
+                  ? "bg-rose-950/30 border-rose-500/20 text-rose-400"
+                  : deadlineState.isUrgent
+                    ? "bg-amber-950/30 border-amber-500/20 text-amber-400"
+                    : theme === "dark"
+                      ? "bg-slate-900 border-slate-800 text-cyan-400"
+                      : "bg-white border-slate-200 text-cyan-600"
+              }`}>
+                <span>{deadlineState.isPast ? "-" : ""}</span>
+                <span>{deadlineState.countdownStr}</span>
+              </div>
+
+              {/* Target timestamp */}
+              <div className="flex items-center gap-1 text-[11px] opacity-90 shrink-0 font-medium">
+                <Clock className="h-3.5 w-3.5 text-cyan-500 shrink-0" />
+                <span className="font-sans">יעד: {deadlineState.targetTimeStr}</span>
+              </div>
             </div>
           </div>
         )
@@ -469,13 +509,25 @@ export default function OrderCard({
       <div className={`mt-1 p-3.5 rounded-xl relative z-10 text-right border ${
         theme === "dark" ? "bg-slate-950/60 border-slate-800/50" : "bg-slate-50/50 border-slate-150"
       }`}>
-        <div className={`flex items-center gap-1.5 pb-2 border-b mb-2 ${theme === "dark" ? "border-slate-900" : "border-slate-150"}`}>
-          <Tag className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="text-[11px] font-bold text-slate-400">מוצרים להכנה:</span>
+        <div className={`flex items-center justify-between pb-2 border-b mb-2 ${theme === "dark" ? "border-slate-900" : "border-slate-150"}`}>
+          <div className="flex items-center gap-1.5">
+            <Tag className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="text-[11px] font-bold text-slate-400">מוצרים להכנה:</span>
+          </div>
+          {order.parsedItems.length > 3 && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+              theme === "dark" ? "text-slate-400 bg-slate-900" : "text-slate-500 bg-slate-100"
+            }`}>
+              {order.parsedItems.length} פריטים
+            </span>
+          )}
         </div>
-        <ul className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
-          {order.parsedItems.map((item, idx) => (
-            <li key={idx} className={`flex items-center justify-between text-xs py-0.5 border-b last:border-b-0 ${
+        
+        <ul className={`space-y-1.5 overflow-y-auto pr-0.5 transition-all duration-300 ${
+          isItemsExpanded ? "max-h-[350px]" : "max-h-[140px]"
+        }`}>
+          {(isItemsExpanded ? order.parsedItems : order.parsedItems.slice(0, 3)).map((item, idx) => (
+            <li key={idx} className={`flex items-center justify-between text-xs py-1 border-b last:border-b-0 ${
               theme === "dark" ? "border-slate-900/20" : "border-slate-100"
             }`}>
               {/* Product Sku on left */}
@@ -489,9 +541,9 @@ export default function OrderCard({
                 <span />
               )}
               {/* Product name & quantity on right */}
-              <div className="flex items-center gap-1.5">
-                <span className={`font-medium ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`}>{item.name}</span>
-                <span className={`font-mono font-bold px-1.5 py-0.2 rounded border ${
+              <div className="flex items-center gap-1.5 max-w-[70%]">
+                <span className={`font-medium truncate ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`} title={item.name}>{item.name}</span>
+                <span className={`font-mono font-bold px-1.5 py-0.2 rounded border shrink-0 ${
                   theme === "dark" ? "text-cyan-400 bg-cyan-950/40 border-cyan-500/15" : "text-cyan-600 bg-cyan-50 border-cyan-200/50"
                 }`}>
                   {item.quantity} יח'
@@ -500,6 +552,23 @@ export default function OrderCard({
             </li>
           ))}
         </ul>
+
+        {order.parsedItems.length > 3 && (
+          <div className="mt-2.5 pt-2 border-t border-slate-900/10 dark:border-slate-900 flex justify-center">
+            <button
+              id={`btn-expand-items-${order.id}`}
+              onClick={() => setIsItemsExpanded(!isItemsExpanded)}
+              className={`text-[10px] md:text-[11px] font-black flex items-center gap-1.5 py-1 px-3 rounded-lg border transition-all active:scale-[0.97] cursor-pointer ${
+                theme === "dark"
+                  ? "bg-slate-900/60 hover:bg-slate-900 border-slate-800 text-cyan-400 hover:text-cyan-300"
+                  : "bg-white hover:bg-slate-50 border-slate-200 text-cyan-600 hover:text-cyan-700 shadow-sm"
+              }`}
+            >
+              <span>{isItemsExpanded ? "הצג פחות" : `הצג הכל (${order.parsedItems.length})`}</span>
+              <span className={`transition-transform duration-200 inline-block ${isItemsExpanded ? "rotate-180" : ""}`}>▼</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Notes / Special Instructions */}

@@ -11,7 +11,7 @@ import OrderStatusHistoryModal from "./components/OrderStatusHistoryModal";
 import { INITIAL_ORDERS } from "./data";
 import { Order, OrderStatus, parseItemsText, getFormattedTimestamp, mapCsvToOrders } from "./types";
 import { playNotificationSound } from "./utils/audio";
-import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Trash2, ArrowUpDown, Shield, Wifi, WifiOff, Moon, Sun, Settings, Link, Clock } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Upload, Download, Info, Check, Trash2, ArrowUpDown, Shield, Wifi, WifiOff, Moon, Sun, Settings, Link, Clock, Maximize2, Minimize2, Package, Plus } from "lucide-react";
 
 export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -231,6 +231,15 @@ export default function App() {
     return localStorage.getItem("sabanos_sheet_url") || "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZCXN68oVhbcihwRCNJp-XizIXXR2HLZWQrvXNJDJ74Hd0IkNY8SwSiFiFzgOAdQ0IW74fIrWPLp_y/pub?gid=0&single=true&output=csv";
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [liveTime, setLiveTime] = useState(new Date());
+
+  useEffect(() => {
+    const clockTimer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
 
   // Helper to get relative date string (YYYY-MM-DD)
   const getRelativeDateString = (daysOffset: number) => {
@@ -843,18 +852,86 @@ export default function App() {
       )}
 
       {/* Header */}
-      <Header
-        onOpenReportModal={() => setIsReportOpen(true)}
-        onOpenAddOrderModal={() => {
-          setEditingOrder(null);
-          setIsFormOpen(true);
-        }}
-        onSync={() => fetchDataFromSheet()}
-        isLoading={isLoading}
-      />
+      {!isFullScreen ? (
+        <Header
+          onOpenReportModal={() => setIsReportOpen(true)}
+          onOpenAddOrderModal={() => {
+            setEditingOrder(null);
+            setIsFormOpen(true);
+          }}
+          onSync={() => fetchDataFromSheet()}
+          isLoading={isLoading}
+        />
+      ) : (
+        <header className={`sticky top-0 z-40 w-full h-14 border-b flex items-center justify-between px-4 md:px-8 transition-all ${
+          isDark 
+            ? "border-cyan-500/30 bg-slate-900/90 backdrop-blur-xl" 
+            : "border-slate-250 bg-white/95 shadow-sm"
+        }`} id="fullscreen-header">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 to-emerald-500 shadow-[0_0_15px_rgba(34,211,238,0.25)] shrink-0">
+              <Package className="h-4 w-4 text-white" />
+            </div>
+            <div className="text-right">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs md:text-sm font-black ${isDark ? "text-white" : "text-slate-800"}`}>מצב מסוף משרד/מחסן</span>
+                <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[8px] font-bold text-cyan-400 border border-cyan-500/20">פעיל</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Clock */}
+            <div className={`hidden md:flex items-center gap-1.5 text-xs font-mono font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              <Clock className="h-3.5 w-3.5 text-cyan-500 animate-pulse" />
+              <span>{liveTime.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+            </div>
+
+            {/* Quick Actions in Fullscreen */}
+            <div className="flex items-center gap-2">
+              <button
+                id="fs-btn-add-order"
+                onClick={() => {
+                  setEditingOrder(null);
+                  setIsFormOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 text-[11px] font-bold transition-all active:scale-[0.98] cursor-pointer"
+              >
+                <Plus className="h-3 w-3" />
+                <span>הזמנה חדשה</span>
+              </button>
+
+              <button
+                id="fs-btn-sync"
+                onClick={() => fetchDataFromSheet()}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all active:scale-[0.98] cursor-pointer ${
+                  isDark
+                    ? "bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                }`}
+              >
+                <RefreshCw className={`h-3 w-3 text-cyan-500 ${isLoading ? "animate-spin" : ""}`} />
+                <span>סנכרון</span>
+              </button>
+
+              <button
+                id="fs-btn-exit"
+                onClick={() => setIsFullScreen(false)}
+                className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/25 px-3 py-1.5 text-[11px] font-extrabold transition-all active:scale-[0.98] cursor-pointer"
+              >
+                <Minimize2 className="h-3 w-3" />
+                <span>מסך רגיל</span>
+              </button>
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Main Content Dashboard Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-8 py-6 flex flex-col gap-6 relative z-10">
+      <main className={`flex-1 w-full mx-auto px-4 md:px-8 py-6 flex flex-col gap-6 relative z-10 transition-all ${
+        isFullScreen ? "max-w-none" : "max-w-7xl"
+      }`}>
         
         {/* Floating Notification Toast */}
         {notification && (
@@ -868,99 +945,103 @@ export default function App() {
           </div>
         )}
 
-        {/* Top Analytics Stats Grid */}
-        <OrderStats orders={orders} theme={theme} />
+        {/* Top Analytics Stats Grid, Charts, and Deadline Center (Hidden in Fullscreen) */}
+        {!isFullScreen && (
+          <>
+            <OrderStats orders={orders} theme={theme} />
 
-        {/* Analytics Dashboard Visualizer Component */}
-        <OrderDashboard orders={orders} theme={theme} />
+            {/* Analytics Dashboard Visualizer Component */}
+            <OrderDashboard orders={orders} theme={theme} />
 
-        {/* 7-Day Daily Volume Chart Component */}
-        <DailyVolumeChart orders={orders} theme={theme} />
+            {/* 7-Day Daily Volume Chart Component */}
+            <DailyVolumeChart orders={orders} theme={theme} />
 
-        {/* Deadlines Alert Center */}
-        {(() => {
-          const urgentOrOverdueOrders = orders.filter(order => {
-            if (!order.deadlineTime || order.status === "נשלח") return false;
-            try {
-              const deadlineDate = new Date(order.deadlineTime);
-              if (isNaN(deadlineDate.getTime())) return false;
-              const diffMs = deadlineDate.getTime() - new Date().getTime();
-              const diffMins = Math.round(diffMs / 60000);
-              const reminderMinutes = order.reminderMinutes ?? 30;
-              return diffMins <= reminderMinutes;
-            } catch {
-              return false;
-            }
-          });
+            {/* Deadlines Alert Center */}
+            {(() => {
+              const urgentOrOverdueOrders = orders.filter(order => {
+                if (!order.deadlineTime || order.status === "נשלח") return false;
+                try {
+                  const deadlineDate = new Date(order.deadlineTime);
+                  if (isNaN(deadlineDate.getTime())) return false;
+                  const diffMs = deadlineDate.getTime() - new Date().getTime();
+                  const diffMins = Math.round(diffMs / 60000);
+                  const reminderMinutes = order.reminderMinutes ?? 30;
+                  return diffMins <= reminderMinutes;
+                } catch {
+                  return false;
+                }
+              });
 
-          if (urgentOrOverdueOrders.length === 0) return null;
+              if (urgentOrOverdueOrders.length === 0) return null;
 
-          return (
-            <div id="deadlines-alert-center" className={`w-full p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
-              isDark 
-                ? "border-rose-500/20 bg-gradient-to-br from-slate-900/80 to-rose-950/10" 
-                : "border-rose-200 bg-rose-50/50 shadow-sm text-slate-800"
-            }`} dir="rtl">
-              <div className="absolute top-0 right-0 h-[2px] w-full bg-gradient-to-l from-rose-500 via-amber-500 to-transparent pointer-events-none" />
-              <div className="flex items-center gap-3 mb-3 text-right">
-                <span className="text-xl animate-bounce">🚨</span>
-                <div>
-                  <h3 className="text-sm font-bold text-rose-500">מרכז התראות: דדליינים דחופים</h3>
-                  <p className="text-[11px] text-slate-400">ההזמנות הבאות קרובות לשעת היעד או עברו אותה. אנא ודא אספקה מיידית!</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {urgentOrOverdueOrders.map(order => {
-                  const deadlineDate = new Date(order.deadlineTime!);
-                  const diffMins = Math.round((deadlineDate.getTime() - new Date().getTime()) / 60000);
-                  const isPast = diffMins < 0;
-                  const absoluteMins = Math.abs(diffMins);
-                  const timeStr = order.deadlineTime!.includes("T") ? order.deadlineTime!.split("T")[1].substring(0, 5) : order.deadlineTime!;
-
-                  let diffText = "";
-                  if (isPast) {
-                    const h = Math.floor(absoluteMins / 60);
-                    const m = absoluteMins % 60;
-                    diffText = h > 0 ? `באיחור של ${h} ש' ו-${m} דק'` : `באיחור של ${m} דק'`;
-                  } else {
-                    const h = Math.floor(absoluteMins / 60);
-                    const m = absoluteMins % 60;
-                    diffText = h > 0 ? `נותרו עוד ${h} ש' ו-${m} דק'` : `נותרו עוד ${m} דק'`;
-                  }
-
-                  return (
-                    <div 
-                      key={order.id}
-                      onClick={() => {
-                        const el = document.getElementById(`order-card-${order.id}`);
-                        if (el) {
-                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          el.classList.add('ring-2', 'ring-rose-500', 'ring-offset-2');
-                          setTimeout(() => el.classList.remove('ring-2', 'ring-rose-500', 'ring-offset-2'), 4000);
-                        }
-                      }}
-                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all ${
-                        isPast
-                          ? isDark ? "bg-rose-950/20 border-rose-500/30 text-rose-300" : "bg-rose-100 border-rose-200 text-rose-800"
-                          : isDark ? "bg-amber-950/20 border-amber-500/30 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-850"
-                      }`}
-                    >
-                      <div className="flex flex-col text-right">
-                        <span className="text-xs font-bold font-sans">#{order.orderNumber} - {order.customerName}</span>
-                        <span className="text-[10px] opacity-80 mt-0.5">{diffText}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-mono text-xs font-bold shrink-0">
-                        <Clock className="h-3.5 w-3.5 text-cyan-400" />
-                        <span>{timeStr}</span>
-                      </div>
+              return (
+                <div id="deadlines-alert-center" className={`w-full p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
+                  isDark 
+                    ? "border-rose-500/20 bg-gradient-to-br from-slate-900/80 to-rose-950/10" 
+                    : "border-rose-200 bg-rose-50/50 shadow-sm text-slate-800"
+                }`} dir="rtl">
+                  <div className="absolute top-0 right-0 h-[2px] w-full bg-gradient-to-l from-rose-500 via-amber-500 to-transparent pointer-events-none" />
+                  <div className="flex items-center gap-3 mb-3 text-right">
+                    <span className="text-xl animate-bounce">🚨</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-rose-500">מרכז התראות: דדליינים דחופים</h3>
+                      <p className="text-[11px] text-slate-400">ההזמנות הבאות קרובות לשעת היעד או עברו אותה. אנא ודא אספקה מיידית!</p>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {urgentOrOverdueOrders.map(order => {
+                      const deadlineDate = new Date(order.deadlineTime!);
+                      const diffMins = Math.round((deadlineDate.getTime() - new Date().getTime()) / 60000);
+                      const isPast = diffMins < 0;
+                      const absoluteMins = Math.abs(diffMins);
+                      const timeStr = order.deadlineTime!.includes("T") ? order.deadlineTime!.split("T")[1].substring(0, 5) : order.deadlineTime!;
+
+                      let diffText = "";
+                      if (isPast) {
+                        const h = Math.floor(absoluteMins / 60);
+                        const m = absoluteMins % 60;
+                        diffText = h > 0 ? `באיחור של ${h} ש' ו-${m} דק'` : `באיחור של ${m} דק'`;
+                      } else {
+                        const h = Math.floor(absoluteMins / 60);
+                        const m = absoluteMins % 60;
+                        diffText = h > 0 ? `נותרו עוד ${h} ש' ו-${m} דק'` : `נותרו עוד ${m} דק'`;
+                      }
+
+                      return (
+                        <div 
+                          key={order.id}
+                          onClick={() => {
+                            const el = document.getElementById(`order-card-${order.id}`);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              el.classList.add('ring-2', 'ring-rose-500', 'ring-offset-2');
+                              setTimeout(() => el.classList.remove('ring-2', 'ring-rose-500', 'ring-offset-2'), 4000);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all ${
+                            isPast
+                              ? isDark ? "bg-rose-950/20 border-rose-500/30 text-rose-300" : "bg-rose-100 border-rose-200 text-rose-800"
+                              : isDark ? "bg-amber-950/20 border-amber-500/30 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-850"
+                          }`}
+                        >
+                          <div className="flex flex-col text-right">
+                            <span className="text-xs font-bold font-sans">#{order.orderNumber} - {order.customerName}</span>
+                            <span className="text-[10px] opacity-80 mt-0.5">{diffText}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 font-mono text-xs font-bold shrink-0">
+                            <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                            <span>{timeStr}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
 
         {/* Filter Controls Row */}
         <div className={`w-full flex flex-col gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-sm relative overflow-hidden z-10 transition-all ${
@@ -1212,16 +1293,44 @@ export default function App() {
         </div>
 
         {/* Sorting and Summary Info Header */}
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 pb-1">
           
-          <div className={`text-xs font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-            <span>נמצאו </span>
-            <span className={`font-mono font-extrabold px-1.5 py-0.2 rounded ${
-              isDark ? "text-cyan-400 bg-cyan-950/40 border border-cyan-500/15" : "text-cyan-600 bg-cyan-50 border border-cyan-200"
-            }`}>
-              {sortedOrders.length}
-            </span>
-            <span> הזמנות תואמות</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`text-xs font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              <span>נמצאו </span>
+              <span className={`font-mono font-extrabold px-1.5 py-0.2 rounded ${
+                isDark ? "text-cyan-400 bg-cyan-950/40 border border-cyan-500/15" : "text-cyan-600 bg-cyan-50 border border-cyan-200"
+              }`}>
+                {sortedOrders.length}
+              </span>
+              <span> הזמנות תואמות</span>
+            </div>
+
+            {/* Full Screen Mode Toggle Button */}
+            <button
+              id="btn-toggle-fullscreen"
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border shadow-sm transition-all active:scale-[0.98] cursor-pointer ${
+                isFullScreen
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/15"
+                  : isDark
+                    ? "bg-slate-950 hover:bg-slate-900 border-slate-850 text-cyan-400 hover:text-cyan-300"
+                    : "bg-white hover:bg-slate-50 border-slate-200 text-cyan-600 hover:text-cyan-700"
+              }`}
+              title="מצב מסך מלא למחסן ומשרד"
+            >
+              {isFullScreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  <span>מסך רגיל</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span>🖥️ מצב מסך מלא</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Sort Buttons */}
