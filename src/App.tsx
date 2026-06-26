@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import Header from "./components/Header";
 import OrderStats from "./components/OrderStats";
 import OrderDashboard from "./components/OrderDashboard";
+import DailyVolumeChart from "./components/DailyVolumeChart";
 import OrderCard from "./components/OrderCard";
 import OrderFormModal from "./components/OrderFormModal";
 import ReportModal from "./components/ReportModal";
 import NoteModal from "./components/NoteModal";
+import OrderStatusHistoryModal from "./components/OrderStatusHistoryModal";
 import { INITIAL_ORDERS } from "./data";
 import { Order, OrderStatus, parseItemsText, getFormattedTimestamp, mapCsvToOrders } from "./types";
 import { playNotificationSound } from "./utils/audio";
@@ -202,6 +204,7 @@ export default function App() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [noteOrder, setNoteOrder] = useState<Order | null>(null);
+  const [historyOrder, setHistoryOrder] = useState<Order | null>(null);
 
   // Sorting state
   const [sortBy, setSortBy] = useState<"date" | "number">("date");
@@ -871,6 +874,9 @@ export default function App() {
         {/* Analytics Dashboard Visualizer Component */}
         <OrderDashboard orders={orders} theme={theme} />
 
+        {/* 7-Day Daily Volume Chart Component */}
+        <DailyVolumeChart orders={orders} theme={theme} />
+
         {/* Deadlines Alert Center */}
         {(() => {
           const urgentOrOverdueOrders = orders.filter(order => {
@@ -1324,6 +1330,7 @@ export default function App() {
                   theme={theme}
                   onSendLoadingCommand={handleSendLoadingCommand}
                   onSendDeliveryUpdate={handleSendDeliveryUpdate}
+                  onViewHistory={(o) => setHistoryOrder(o)}
                 />
               ))}
             </div>
@@ -1557,6 +1564,13 @@ export default function App() {
         orderNumber={noteOrder?.orderNumber || ""}
         initialNote={noteOrder?.notes || ""}
         onSave={handleSaveNote}
+      />
+
+      <OrderStatusHistoryModal
+        isOpen={historyOrder !== null}
+        onClose={() => setHistoryOrder(null)}
+        order={historyOrder}
+        theme={theme}
       />
 
       {/* Contact Selector Fallback Picker Modal */}

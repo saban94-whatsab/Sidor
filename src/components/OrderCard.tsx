@@ -14,6 +14,7 @@ interface OrderCardProps {
   key?: string;
   onSendLoadingCommand?: (order: Order) => void;
   onSendDeliveryUpdate?: (order: Order) => void;
+  onViewHistory?: (order: Order) => void;
 }
 
 export default function OrderCard({
@@ -26,10 +27,12 @@ export default function OrderCard({
   onSelectChange,
   theme = "dark",
   onSendLoadingCommand,
-  onSendDeliveryUpdate
+  onSendDeliveryUpdate,
+  onViewHistory
 }: OrderCardProps) {
   const [prevStatus, setPrevStatus] = useState<OrderStatus>(order.status);
   const [isFlashing, setIsFlashing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     if (order.status !== prevStatus) {
@@ -41,6 +44,99 @@ export default function OrderCard({
       return () => clearTimeout(timer);
     }
   }, [order.status, prevStatus]);
+
+  useEffect(() => {
+    if (order.status === "בהכנה" && order.deadlineTime) {
+      const interval = setInterval(() => {
+        setCurrentTime(new Date());
+      }, 1000); // update every second for live countdown precision
+      return () => clearInterval(interval);
+    }
+  }, [order.status, order.deadlineTime]);
+
+  // Calculation for "בהכנה" preparation timer progress bar
+  const getPrepTimerInfo = () => {
+    if (order.status !== "בהכנה" || !order.deadlineTime) return null;
+
+    try {
+      const deadlineMs = new Date(order.deadlineTime).getTime();
+      if (isNaN(deadlineMs)) return null;
+
+      // Find start time of preparation
+      const prepLog = order.statusLog?.find(entry => entry.status === "בהכנה");
+      let startMs = prepLog ? new Date(prepLog.timestamp).getTime() : null;
+
+      // If no prep status log, use the first log entry or fallback to 45 mins before deadline
+      if (!startMs || isNaN(startMs)) {
+        const firstLog = order.statusLog?.[0];
+        const firstLogMs = firstLog ? new Date(firstLog.timestamp).getTime() : null;
+        startMs = firstLogMs && !isNaN(firstLogMs) ? firstLogMs : deadlineMs - 45 * 60 * 1000;
+      }
+
+      // Ensure start is before deadline to avoid division issues
+      if (startMs >= deadlineMs) {
+        startMs = deadlineMs - 45 * 60 * 1000; // default 45 minutes prep
+      }
+
+      const nowMs = currentTime.getTime();
+      const totalDuration = deadlineMs - startMs;
+      const elapsed = nowMs - startMs;
+      const remainingMs = deadlineMs - nowMs;
+
+      // Calculate percentage: 0% is start of prep, 100% is deadline.
+      // So percentage of elapsed preparation is: (elapsed / totalDuration) * 100
+      let progressPercent = Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+
+      const isOverdue = remainingMs < 0;
+      const absoluteRemainingMs = Math.abs(remainingMs);
+      
+      // Detailed time breakdown
+      const totalSeconds = Math.floor(absoluteRemainingMs / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      // Color scheme based on status
+      let colorClass = "bg-gradient-to-r from-emerald-500 to-cyan-500";
+      let textClass = "text-cyan-400";
+      let ringGlow = "shadow-[0_0_10px_rgba(6,182,212,0.3)]";
+      let labelText = "בזמן";
+
+      const reminderMins = order.reminderMinutes ?? 30;
+      const isUrgent = remainingMs <= reminderMins * 60 * 1000;
+
+      if (isOverdue) {
+        colorClass = "bg-gradient-to-r from-rose-600 to-red-500 animate-pulse";
+        textClass = "text-rose-500 font-extrabold";
+        ringGlow = "shadow-[0_0_12px_rgba(239,68,68,0.5)]";
+        labelText = "חריגת זמן!";
+        progressPercent = 100; // full red bar when overdue
+      } else if (isUrgent) {
+        colorClass = "bg-gradient-to-r from-amber-500 to-orange-500";
+        textClass = "text-amber-500 font-bold";
+        ringGlow = "shadow-[0_0_10px_rgba(245,158,11,0.35)]";
+        labelText = "לחץ זמן";
+      }
+
+      return {
+        progressPercent,
+        hours,
+        minutes,
+        seconds,
+        isOverdue,
+        colorClass,
+        textClass,
+        ringGlow,
+        labelText,
+        remainingMs
+      };
+    } catch (e) {
+      console.error("Error calculating prep timer:", e);
+      return null;
+    }
+  };
+
+  const prepTimer = getPrepTimerInfo();
 
   const getFlashClass = () => {
     if (!isFlashing) return "scale-100";
@@ -238,28 +334,94 @@ export default function OrderCard({
         </div>
       </div>
 
-      {/* Deadline Alert Banner */}
-      {deadlineState && (
-        <div id={`order-deadline-alert-${order.id}`} className={`mt-3 p-2.5 rounded-xl border flex items-center justify-between relative z-10 ${
-          deadlineState.isPast
-            ? "border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)] animate-pulse"
-            : deadlineState.isUrgent
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse"
-              : theme === "dark" 
-                ? "border-slate-800 bg-slate-950/40 text-slate-300" 
-                : "border-slate-200 bg-slate-50 text-slate-600"
-        }`}>
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${
-              deadlineState.isPast ? "bg-rose-500" : deadlineState.isUrgent ? "bg-amber-500" : "bg-cyan-400"
-            } ${deadlineState.isUrgent || deadlineState.isPast ? "animate-ping" : ""}`} />
-            <span className="text-xs font-bold font-mono text-right">{deadlineState.timeText}</span>
+      {/* Deadline Alert Banner or Preparation Live Progress Timer */}
+      {order.status === "בהכנה" && prepTimer ? (
+        <div 
+          id={`prep-timer-container-${order.id}`}
+          className={`mt-3 p-3 rounded-xl border relative z-10 overflow-hidden transition-all duration-350 ${
+            theme === "dark" 
+              ? prepTimer.isOverdue 
+                ? "border-rose-500/35 bg-rose-950/20 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                : "border-slate-800 bg-slate-950/40"
+              : prepTimer.isOverdue
+                ? "border-rose-300 bg-rose-50/50 text-rose-700"
+                : "border-slate-200 bg-slate-50/80"
+          }`}
+          dir="rtl"
+        >
+          {/* Subtle background flashing overlay when overdue */}
+          {prepTimer.isOverdue && (
+            <div className="absolute inset-0 bg-gradient-to-r from-rose-500/5 to-transparent pointer-events-none animate-pulse" />
+          )}
+
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <span className={`flex h-2 w-2 rounded-full ${prepTimer.isOverdue ? "bg-rose-500 animate-pulse" : "bg-cyan-400 animate-pulse"}`} />
+              <span className={`text-[11px] font-extrabold ${theme === "dark" ? "text-slate-300" : "text-slate-700"}`}>
+                זמן הכנה שנותר:
+              </span>
+            </div>
+            
+            {/* Live digital countdown timer */}
+            <div className={`font-mono text-xs font-black tracking-wider flex items-center gap-0.5 ${prepTimer.textClass}`}>
+              <span>{prepTimer.isOverdue ? "-" : ""}</span>
+              {prepTimer.hours > 0 && (
+                <>
+                  <span>{String(prepTimer.hours).padStart(2, '0')}</span>
+                  <span className="animate-pulse">:</span>
+                </>
+              )}
+              <span>{String(prepTimer.minutes).padStart(2, '0')}</span>
+              <span className="animate-pulse">:</span>
+              <span>{String(prepTimer.seconds).padStart(2, '0')}</span>
+              <span className="text-[10px] font-sans font-medium mr-1 opacity-85">
+                ({prepTimer.labelText})
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-[11px] opacity-90">
-            <Clock className="h-3.5 w-3.5 text-cyan-400" />
-            <span>יעד: {deadlineState.targetTimeStr}</span>
+
+          {/* Progress Bar Track */}
+          <div className={`w-full h-2 rounded-full overflow-hidden relative ${
+            theme === "dark" ? "bg-slate-900" : "bg-slate-200"
+          }`}>
+            <div 
+              className={`h-full rounded-full transition-all duration-1000 ease-out ${prepTimer.colorClass} ${prepTimer.ringGlow}`}
+              style={{ width: `${prepTimer.progressPercent}%` }}
+            />
+          </div>
+
+          {/* Time markers and percentage labels */}
+          <div className="flex justify-between items-center mt-1.5 text-[9px] font-bold text-slate-500 font-sans">
+            <span>התחלת הכנה</span>
+            <span className={prepTimer.isOverdue ? "text-rose-500 animate-pulse font-black" : "text-slate-400"}>
+              {prepTimer.isOverdue ? "חריגה מהדדליין!" : `${Math.round(100 - prepTimer.progressPercent)}% נותר`}
+            </span>
+            <span>יעד: {order.deadlineTime.includes("T") ? order.deadlineTime.split("T")[1].substring(0, 5) : order.deadlineTime}</span>
           </div>
         </div>
+      ) : (
+        deadlineState && (
+          <div id={`order-deadline-alert-${order.id}`} className={`mt-3 p-2.5 rounded-xl border flex items-center justify-between relative z-10 ${
+            deadlineState.isPast
+              ? "border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)] animate-pulse"
+              : deadlineState.isUrgent
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse"
+                : theme === "dark" 
+                  ? "border-slate-800 bg-slate-950/40 text-slate-300" 
+                  : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${
+                deadlineState.isPast ? "bg-rose-500" : deadlineState.isUrgent ? "bg-amber-500" : "bg-cyan-400"
+              } ${deadlineState.isUrgent || deadlineState.isPast ? "animate-ping" : ""}`} />
+              <span className="text-xs font-bold font-mono text-right">{deadlineState.timeText}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[11px] opacity-90">
+              <Clock className="h-3.5 w-3.5 text-cyan-400" />
+              <span>יעד: {deadlineState.targetTimeStr}</span>
+            </div>
+          </div>
+        )
       )}
 
       {/* Card Body: Customer details & Address */}
@@ -400,6 +562,16 @@ export default function OrderCard({
         </button>
 
         <div className="flex items-center gap-3">
+          <button
+            id={`btn-history-${order.id}`}
+            onClick={() => onViewHistory?.(order)}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-purple-400 transition-colors cursor-pointer"
+            title="הצג היסטוריית שינויי סטטוס"
+          >
+            <Clock className="h-3.5 w-3.5 text-purple-500" />
+            <span>היסטוריה</span>
+          </button>
+
           <button
             id={`btn-add-note-${order.id}`}
             onClick={() => onAddNote(order.id)}
