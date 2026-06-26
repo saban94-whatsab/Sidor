@@ -198,6 +198,9 @@ export default function App() {
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>("הכל");
   const [customDate, setCustomDate] = useState("");
   const [dashboardView, setDashboardView] = useState<"active" | "archive">("active");
+  const [showDeepArchive, setShowDeepArchive] = useState(false);
+  const [showCleanupPrompt, setShowCleanupPrompt] = useState(false);
+  const [olderSentCount, setOlderSentCount] = useState(0);
 
   const handleSetDashboardView = (view: "active" | "archive") => {
     setDashboardView(view);
@@ -385,7 +388,33 @@ export default function App() {
         showNotification("סינכרון ראשוני מגוגל שיטס הושלם בהצלחה!", "success");
       }
 
-      updateOrdersState(sheetOrders);
+      // Merge sheetOrders with local changes to preserve fields (status, isArchived, notes, deadlines)
+      const currentOrdersMap = new Map<string, Order>();
+      if (Array.isArray(currentOrdersList)) {
+        currentOrdersList.forEach((o: Order) => {
+          if (o && o.orderNumber) {
+            currentOrdersMap.set(o.orderNumber, o);
+          }
+        });
+      }
+
+      const mergedOrders = sheetOrders.map(sheetOrder => {
+        const localOrder = currentOrdersMap.get(sheetOrder.orderNumber);
+        if (localOrder) {
+          return {
+            ...sheetOrder,
+            status: localOrder.status, // preserve local status changes
+            isArchived: localOrder.isArchived || false, // preserve archived state
+            notes: localOrder.notes || sheetOrder.notes,
+            deadlineTime: localOrder.deadlineTime || sheetOrder.deadlineTime,
+            reminderMinutes: localOrder.reminderMinutes || sheetOrder.reminderMinutes,
+            statusLog: localOrder.statusLog || sheetOrder.statusLog
+          };
+        }
+        return sheetOrder;
+      });
+
+      updateOrdersState(mergedOrders);
     } catch (err: any) {
       console.error("Fetch sheet error:", err);
       setFetchError(err.message || "שגיאה בגישה לגוגל שיטס");
@@ -424,6 +453,24 @@ export default function App() {
       showNotification("עובד במצב אופליין - מציג נתונים שמורים בלבד", "info");
     }
   }, []);
+
+  // 1b. Automated Daily Cleanup Check
+  useEffect(() => {
+    if (orders.length === 0) return;
+    
+    // Check if we already prompted today
+    const todayStr = new Date().toISOString().split("T")[0];
+    const lastPromptDate = localStorage.getItem("sabanos_last_cleanup_prompt_date");
+    if (lastPromptDate === todayStr) {
+      return; // already prompted today
+    }
+
+    const olderSent = getOlderSentOrders(orders);
+    if (olderSent.length > 0) {
+      setOlderSentCount(olderSent.length);
+      setShowCleanupPrompt(true);
+    }
+  }, [orders]);
 
   // Check deadlines every 10 seconds and trigger alerts / plays sound
   useEffect(() => {
@@ -556,6 +603,7 @@ export default function App() {
           return {
             ...order,
             status: newStatus,
+            isArchived: newStatus === "נשלח" ? order.isArchived : false,
             statusLog: [...existingLog, newLogEntry]
           };
         }
@@ -564,6 +612,75 @@ export default function App() {
     });
     updateOrdersState(updated);
     showNotification(`הסטטוס עודכן בהצלחה ל"${newStatus}"`, "success");
+  };
+
+  // Archive / Unarchive toggle
+  const handleToggleArchive = (orderId: string) => {
+    const updated = orders.map(order => {
+      if (order.id === orderId) {
+        const nextArchived = !order.isArchived;
+        return {
+          ...order,
+          isArchived: nextArchived
+        };
+      }
+      return order;
+    });
+    updateOrdersState(updated);
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      const msg = !order.isArchived ? "ההזמנה הועברה לארכיון עמוק בהצלחה!" : "ההזמנה הוחזרה לרשימה בהצלחה!";
+      showNotification(msg, "success");
+    }
+  };
+
+  // Helper to find sent orders older than 7 days
+  const getOlderSentOrders = (ordersList: Order[]) => {
+    const now = new Date();
+    const cutoff = new Date();
+    cutoff.setDate(now.getDate() - 7);
+    cutoff.setHours(0, 0, 0, 0);
+
+    return ordersList.filter(order => {
+      if (order.status !== "נשלח" || order.isArchived) return false;
+      const orderDate = new Date(order.date);
+      return !isNaN(orderDate.getTime()) && orderDate < cutoff;
+    });
+  };
+
+  // Archive all matching old orders
+  const handleArchiveOlderOrders = () => {
+    const now = new Date();
+    const cutoff = new Date();
+    cutoff.setDate(now.getDate() - 7);
+    cutoff.setHours(0, 0, 0, 0);
+
+    const updated = orders.map(order => {
+      if (order.status === "נשלח" && !order.isArchived) {
+        const orderDate = new Date(order.date);
+        if (!isNaN(orderDate.getTime()) && orderDate < cutoff) {
+          return {
+            ...order,
+            isArchived: true
+          };
+        }
+      }
+      return order;
+    });
+
+    updateOrdersState(updated);
+    
+    const todayStr = new Date().toISOString().split("T")[0];
+    localStorage.setItem("sabanos_last_cleanup_prompt_date", todayStr);
+    
+    showNotification(`🧹 ${olderSentCount} הזמנות הועברו לארכיון העמוק בהצלחה!`, "success");
+    setShowCleanupPrompt(false);
+  };
+
+  const handleDismissCleanupPrompt = () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    localStorage.setItem("sabanos_last_cleanup_prompt_date", todayStr);
+    setShowCleanupPrompt(false);
   };
 
   // 3. Add or Edit Order Submission
@@ -802,8 +919,8 @@ export default function App() {
 
     // 2. Active/Archive view segmentation filter
     const matchView = dashboardView === "active"
-      ? (order.status !== "נשלח")
-      : (order.status === "נשלח");
+      ? (order.status !== "נשלח" && !order.isArchived)
+      : (order.status === "נשלח" && (showDeepArchive || !order.isArchived));
 
     // 3. Status Tab Filter (only applies in Active view)
     const matchStatus = dashboardView === "archive"
@@ -1051,6 +1168,56 @@ export default function App() {
             </div>
             <p className="text-xs font-semibold">{notification.message}</p>
           </div>
+        )}
+
+        {/* Automated Cleanup Banner */}
+        {showCleanupPrompt && olderSentCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            id="cleanup-alert-banner"
+            className={`w-full p-4 md:p-5 rounded-2xl border backdrop-blur-md relative overflow-hidden z-20 transition-all ${
+              isDark 
+                ? "border-purple-500/35 bg-gradient-to-r from-purple-950/20 via-slate-900/95 to-slate-900/95 shadow-[0_0_30px_rgba(168,85,247,0.1)]" 
+                : "border-purple-200 bg-purple-50/95 shadow-md text-slate-800"
+            }`}
+            dir="rtl"
+          >
+            <div className="absolute top-0 right-0 h-[3px] w-full bg-gradient-to-l from-purple-500 via-pink-500 to-transparent pointer-events-none" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5 text-right">
+                <span className="text-2xl shrink-0 p-1.5 rounded-xl bg-purple-500/10 text-purple-400">🧹</span>
+                <div>
+                  <h3 className="text-sm font-black text-purple-400">משימת ניקוי יומית מומלצת</h3>
+                  <p className={`text-xs mt-1.5 leading-relaxed font-bold ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                    נמצאו <span className="text-purple-500 font-black text-sm px-1 underline">{olderSentCount}</span> הזמנות שנשלחו לפני יותר מ-7 ימים.
+                    העברה לארכיון עמוק תשמור על לוח המעקב וארכיון ההיסטוריה שלך מהיר, נקי וממוקד.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
+                <button
+                  id="btn-cleanup-approve"
+                  onClick={handleArchiveOlderOrders}
+                  className="px-4 py-2 text-xs font-black rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg hover:shadow-purple-500/20 transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  כן, העבר לארכיון עמוק
+                </button>
+                <button
+                  id="btn-cleanup-dismiss"
+                  onClick={handleDismissCleanupPrompt}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                    isDark 
+                      ? "bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-850" 
+                      : "bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                  }`}
+                >
+                  לא כעת
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Top Analytics Stats Grid, Charts, and Deadline Center (Hidden in Fullscreen) */}
@@ -1301,11 +1468,28 @@ export default function App() {
                   ))}
                 </div>
               ) : (
-                <div className={`flex border p-2 rounded-xl text-xs font-black items-center gap-2 ${
-                  isDark ? "bg-purple-950/20 border-purple-900/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.05)]" : "bg-purple-50 border-purple-100 text-purple-700"
-                }`}>
-                  <span className="text-sm">🗄️</span>
-                  <span>מציג הזמנות שסופקו ונשלחו לארכיון בלבד</span>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className={`flex border p-2 rounded-xl text-xs font-black items-center gap-2 ${
+                    isDark ? "bg-purple-950/20 border-purple-900/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.05)]" : "bg-purple-50 border-purple-100 text-purple-700"
+                  }`}>
+                    <span className="text-sm">🗄️</span>
+                    <span>מציג הזמנות שסופקו ונשלחו לארכיון בלבד</span>
+                  </div>
+                  <button
+                    id="toggle-deep-archive"
+                    onClick={() => setShowDeepArchive(!showDeepArchive)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black transition-all border cursor-pointer ${
+                      showDeepArchive
+                        ? isDark
+                          ? "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                          : "bg-purple-100 text-purple-800 border-purple-300 shadow-sm"
+                        : isDark
+                          ? "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200"
+                          : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 shadow-sm"
+                    }`}
+                  >
+                    <span>{showDeepArchive ? "📂 הסתר ארכיון עמוק" : "📁 הצג ארכיון עמוק (ישנות מ-7 ימים)"}</span>
+                  </button>
                 </div>
               )}
 
@@ -1676,6 +1860,7 @@ export default function App() {
                       onSendLoadingCommand={handleSendLoadingCommand}
                       onSendDeliveryUpdate={handleSendDeliveryUpdate}
                       onViewHistory={(o) => setHistoryOrder(o)}
+                      onToggleArchive={handleToggleArchive}
                     />
                   </motion.div>
                 ))}

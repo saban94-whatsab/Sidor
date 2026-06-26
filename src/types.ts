@@ -25,6 +25,7 @@ export interface Order {
   statusLog?: StatusLogEntry[];
   deadlineTime?: string; // Format: YYYY-MM-DDTHH:mm or HH:mm
   reminderMinutes?: number; // Minutes before deadline to show a warning
+  isArchived?: boolean; // Flag to indicate if the order has been archived (deep archive)
 }
 
 export const STATUS_OPTIONS: OrderStatus[] = [

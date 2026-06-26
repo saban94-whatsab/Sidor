@@ -15,6 +15,7 @@ interface OrderCardProps {
   onSendLoadingCommand?: (order: Order) => void;
   onSendDeliveryUpdate?: (order: Order) => void;
   onViewHistory?: (order: Order) => void;
+  onToggleArchive?: (orderId: string) => void;
 }
 
 export default function OrderCard({
@@ -28,7 +29,8 @@ export default function OrderCard({
   theme = "dark",
   onSendLoadingCommand,
   onSendDeliveryUpdate,
-  onViewHistory
+  onViewHistory,
+  onToggleArchive
 }: OrderCardProps) {
   const [prevStatus, setPrevStatus] = useState<OrderStatus>(order.status);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -329,9 +331,16 @@ export default function OrderCard({
             <Hash className="h-4 w-4 text-cyan-400" />
           </div>
           <div className="flex flex-col text-right">
-            <span className="font-mono text-base font-bold text-cyan-400 tracking-wide">
-              #{order.orderNumber}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-base font-bold text-cyan-400 tracking-wide">
+                #{order.orderNumber}
+              </span>
+              {order.isArchived && (
+                <span className="rounded bg-purple-500/10 border border-purple-500/25 px-1.5 py-0.2 text-[9px] font-black text-purple-400 animate-pulse">
+                  ארכיון עמוק
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
               <Calendar className="h-3 w-3" />
               <span className="font-mono">{formatDateHebrew(order.date)}</span>
@@ -604,20 +613,39 @@ export default function OrderCard({
 
       {/* WhatsApp Smart Actions OR Restore Button if Archived */}
       {order.status === "נשלח" ? (
-        <div className={`mt-4 pt-3.5 border-t flex relative z-10 ${
+        <div className={`mt-4 pt-3.5 border-t grid grid-cols-2 gap-3 relative z-10 ${
           theme === "dark" ? "border-slate-800/40" : "border-slate-150"
         }`}>
           <button
             id={`btn-restore-${order.id}`}
             onClick={() => onStatusChange(order.id, "ממתין להכנה")}
-            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md border ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[11px] font-black transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md border ${
               theme === "dark"
-                ? "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.1)] hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:border-purple-500/50"
+                ? "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.1)] hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
                 : "bg-purple-50 hover:bg-purple-100/80 border-purple-200 text-purple-700 shadow-sm"
             }`}
+            title="החזר את ההזמנה ללוח המעקב הפעיל"
           >
             <span>🔄</span>
-            <span>החזר ללוח פעיל</span>
+            <span>החזר ללוח</span>
+          </button>
+
+          <button
+            id={`btn-toggle-archive-${order.id}`}
+            onClick={() => onToggleArchive?.(order.id)}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[11px] font-black transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md border ${
+              order.isArchived
+                ? theme === "dark"
+                  ? "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                  : "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700 shadow-sm"
+                : theme === "dark"
+                  ? "bg-slate-950 border-slate-800 hover:bg-slate-900 text-purple-300"
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-800 shadow-sm"
+            }`}
+            title={order.isArchived ? "הוצא מהארכיון העמוק" : "העבר לארכיון העמוק"}
+          >
+            <span>{order.isArchived ? "📂" : "📁"}</span>
+            <span>{order.isArchived ? "הוצא מארכיון" : "ארכיון עמוק"}</span>
           </button>
         </div>
       ) : (
