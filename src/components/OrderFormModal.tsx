@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Order, OrderStatus, STATUS_OPTIONS } from "../types";
-import { X, Save, FileText, Calendar, Hash, User, MapPin, Phone, HelpCircle, History, Clock, Bell } from "lucide-react";
+import { X, Save, FileText, Calendar, Hash, User, MapPin, Phone, HelpCircle, History, Clock, Bell, Image } from "lucide-react";
 
 interface OrderFormModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
   const [notes, setNotes] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [reminderMinutes, setReminderMinutes] = useState<number>(30);
+  const [productImageUrl, setProductImageUrl] = useState("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -34,6 +35,7 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
       setItems(editingOrder.items);
       setStatus(editingOrder.status);
       setNotes(editingOrder.notes || "");
+      setProductImageUrl(editingOrder.productImageUrl || "");
       
       if (editingOrder.deadlineTime) {
         if (editingOrder.deadlineTime.includes("T")) {
@@ -65,11 +67,23 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
       setNotes("");
       setDeadlineTime("");
       setReminderMinutes(30);
+      setProductImageUrl("");
     }
     setErrors({});
   }, [editingOrder, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleProductImageUrlChange = (val: string) => {
+    setProductImageUrl(val);
+    if (errors.productImageUrl) {
+      setErrors(prev => {
+        const copy = { ...prev };
+        delete copy.productImageUrl;
+        return copy;
+      });
+    }
+  };
 
   const validate = () => {
     const tempErrors: Record<string, string> = {};
@@ -79,6 +93,28 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
     if (!deliveryAddress.trim()) tempErrors.deliveryAddress = "חובה להזין כתובת אספקה";
     if (!contactPerson.trim()) tempErrors.contactPerson = "חובה להזין איש קשר וטלפון";
     if (!items.trim()) tempErrors.items = "חובה להזין מוצרים";
+
+    if (productImageUrl.trim()) {
+      try {
+        const url = new URL(productImageUrl.trim());
+        if (!url.protocol.startsWith("http")) {
+          tempErrors.productImageUrl = "הקישור חייב להתחיל ב-http או https";
+        } else {
+          // Check for standard image extensions or common parameters
+          const cleanPath = url.pathname.toLowerCase();
+          const hasImageExtension = /\.(jpg|jpeg|png|webp|gif|svg|bmp)(\?.*)?$/i.test(cleanPath);
+          const isGoogleDriveImg = url.hostname.includes("drive.google.com") || url.hostname.includes("googleusercontent.com");
+          const isUnsplashImg = url.hostname.includes("unsplash.com");
+          
+          if (!hasImageExtension && !isGoogleDriveImg && !isUnsplashImg && !cleanPath.includes("image") && !cleanPath.includes("img")) {
+            // Optional warning: We won't strictly block if it doesn't end with image ext, but we prompt or warn. Let's make it a mild warning or allow any valid URL to be highly permissive for different formats like cloud storage.
+            // Let's allow it as long as it's a valid URL, but if they put plain text, the new URL() check above will throw and catch it.
+          }
+        }
+      } catch (e) {
+        tempErrors.productImageUrl = "נא להזין כתובת אינטרנט (URL) תקינה";
+      }
+    }
     
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
@@ -99,7 +135,8 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
       status,
       notes: notes.trim() || undefined,
       deadlineTime: deadlineTime ? `${date}T${deadlineTime}` : undefined,
-      reminderMinutes: deadlineTime ? Number(reminderMinutes) : undefined
+      reminderMinutes: deadlineTime ? Number(reminderMinutes) : undefined,
+      productImageUrl: productImageUrl.trim() || null
     });
     
     onClose();
@@ -272,6 +309,41 @@ export default function OrderFormModal({ isOpen, onClose, onSubmit, editingOrder
                 className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all"
                 placeholder="דחוף לפרוק עם מנוף..."
               />
+            </div>
+          </div>
+
+          {/* Product Image URL with Live Preview */}
+          <div className="flex flex-col gap-1.5 border-t border-slate-800/60 pt-4">
+            <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <Image className="h-3.5 w-3.5 text-cyan-400" />
+              <span>קישור לתמונת מוצר (אופציונלי):</span>
+            </label>
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
+              <div className="flex-1 w-full flex flex-col gap-1">
+                <input
+                  type="text"
+                  value={productImageUrl}
+                  onChange={(e) => handleProductImageUrlChange(e.target.value)}
+                  className={`w-full bg-slate-950 border ${errors.productImageUrl ? 'border-red-500' : 'border-slate-800 focus:border-cyan-500'} rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none transition-all`}
+                  placeholder="https://example.com/image.jpg"
+                />
+                {errors.productImageUrl && <span className="text-[11px] text-red-400 font-semibold">{errors.productImageUrl}</span>}
+                <span className="text-[10px] text-slate-500 leading-relaxed">הזינו כתובת URL של תמונה כדי לסייע לנהגים לזהות חזותית את הפריטים במסירה</span>
+              </div>
+              
+              {productImageUrl.trim() && !errors.productImageUrl && (
+                <div className="h-[74px] w-[74px] rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shrink-0 flex items-center justify-center relative shadow-inner group">
+                  <img
+                    src={productImageUrl.trim()}
+                    alt="תצוגה מקדימה"
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                    onError={() => {
+                      setErrors(prev => ({ ...prev, productImageUrl: "שגיאה בטעינת התמונה מהקישור שסופק" }));
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

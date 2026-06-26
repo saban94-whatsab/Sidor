@@ -406,6 +406,7 @@ export default function App() {
             status: localOrder.status, // preserve local status changes
             isArchived: localOrder.isArchived || false, // preserve archived state
             notes: localOrder.notes || sheetOrder.notes,
+            productImageUrl: localOrder.productImageUrl || sheetOrder.productImageUrl,
             deadlineTime: localOrder.deadlineTime || sheetOrder.deadlineTime,
             reminderMinutes: localOrder.reminderMinutes || sheetOrder.reminderMinutes,
             statusLog: localOrder.statusLog || sheetOrder.statusLog
@@ -709,6 +710,7 @@ export default function App() {
             parsedItems: parseItemsText(orderData.items),
             status: orderData.status,
             notes: orderData.notes,
+            productImageUrl: orderData.productImageUrl,
             statusLog
           };
         }
@@ -729,6 +731,7 @@ export default function App() {
         parsedItems: parseItemsText(orderData.items),
         status: orderData.status,
         notes: orderData.notes,
+        productImageUrl: orderData.productImageUrl,
         statusLog: [
           {
             status: orderData.status,

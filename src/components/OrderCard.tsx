@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Order, OrderStatus, STATUS_OPTIONS } from "../types";
-import { Calendar, Hash, User, MapPin, Phone, FileText, Edit, Trash2, ExternalLink, Tag, MessageSquare, Clock, Bell } from "lucide-react";
+import { Calendar, Hash, User, MapPin, Phone, FileText, Edit, Trash2, ExternalLink, Tag, MessageSquare, Clock, Bell, Package } from "lucide-react";
 
 interface OrderCardProps {
   order: Order;
@@ -31,11 +31,16 @@ export default function OrderCard({
   onSendDeliveryUpdate,
   onViewHistory,
   onToggleArchive
-}: OrderCardProps) {
+ }: OrderCardProps) {
   const [prevStatus, setPrevStatus] = useState<OrderStatus>(order.status);
   const [isFlashing, setIsFlashing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isItemsExpanded, setIsItemsExpanded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [order.productImageUrl]);
 
   useEffect(() => {
     if (order.status !== prevStatus) {
@@ -536,7 +541,7 @@ export default function OrderCard({
       <div className={`mt-1 p-3.5 rounded-xl relative z-10 text-right border ${
         theme === "dark" ? "bg-slate-950/60 border-slate-800/50" : "bg-slate-50/50 border-slate-150"
       }`}>
-        <div className={`flex items-center justify-between pb-2 border-b mb-2 ${theme === "dark" ? "border-slate-900" : "border-slate-150"}`}>
+        <div className={`flex items-center justify-between pb-2 border-b mb-3 ${theme === "dark" ? "border-slate-900" : "border-slate-150"}`}>
           <div className="flex items-center gap-1.5">
             <Tag className="h-3.5 w-3.5 text-cyan-400" />
             <span className="text-[11px] font-bold text-slate-400">מוצרים להכנה:</span>
@@ -550,35 +555,63 @@ export default function OrderCard({
           )}
         </div>
         
-        <ul className={`space-y-1.5 overflow-y-auto pr-0.5 transition-all duration-300 ${
-          isItemsExpanded ? "max-h-[350px]" : "max-h-[140px]"
-        }`}>
-          {(isItemsExpanded ? order.parsedItems : order.parsedItems.slice(0, 3)).map((item, idx) => (
-            <li key={idx} className={`flex items-center justify-between text-xs py-1 border-b last:border-b-0 ${
-              theme === "dark" ? "border-slate-900/20" : "border-slate-100"
-            }`}>
-              {/* Product Sku on left */}
-              {item.sku ? (
-                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
-                  theme === "dark" ? "bg-slate-900 text-slate-500 border-slate-850" : "bg-slate-100 text-slate-600 border-slate-200"
-                }`}>
-                  {item.sku}
-                </span>
-              ) : (
-                <span />
-              )}
-              {/* Product name & quantity on right */}
-              <div className="flex items-center gap-1.5 max-w-[70%]">
-                <span className={`font-medium truncate ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`} title={item.name}>{item.name}</span>
-                <span className={`font-mono font-bold px-1.5 py-0.2 rounded border shrink-0 ${
-                  theme === "dark" ? "text-cyan-400 bg-cyan-950/40 border-cyan-500/15" : "text-cyan-600 bg-cyan-50 border-cyan-200/50"
-                }`}>
-                  {item.quantity} יח'
-                </span>
+        <div className="flex flex-row gap-3.5 items-start">
+          {/* Product Image Section (Left-aligned/Side-by-side) */}
+          <div className="flex items-center justify-center shrink-0">
+            {order.productImageUrl && !imageError ? (
+              <div className={`relative h-[68px] w-[68px] rounded-xl overflow-hidden border ${theme === "dark" ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"} shadow-md group`}>
+                <img
+                  src={order.productImageUrl}
+                  alt="תמונת מוצר"
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  onError={() => setImageError(true)}
+                />
               </div>
-            </li>
-          ))}
-        </ul>
+            ) : (
+              <div className={`flex h-[68px] w-[68px] items-center justify-center rounded-xl border border-dashed ${
+                theme === "dark" 
+                  ? "border-slate-800 bg-slate-950/40 text-slate-600" 
+                  : "border-slate-200 bg-slate-50 text-slate-400"
+              }`} title="אין תמונת מוצר">
+                <Package className="h-6 w-6 opacity-45" />
+              </div>
+            )}
+          </div>
+
+          {/* Products List Section */}
+          <div className="flex-1 min-w-0">
+            <ul className={`space-y-1.5 overflow-y-auto pr-0.5 transition-all duration-300 ${
+              isItemsExpanded ? "max-h-[350px]" : "max-h-[140px]"
+            }`}>
+              {(isItemsExpanded ? order.parsedItems : order.parsedItems.slice(0, 3)).map((item, idx) => (
+                <li key={idx} className={`flex items-center justify-between text-xs py-1 border-b last:border-b-0 ${
+                  theme === "dark" ? "border-slate-900/20" : "border-slate-100"
+                }`}>
+                  {/* Product Sku on left */}
+                  {item.sku ? (
+                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
+                      theme === "dark" ? "bg-slate-900 text-slate-500 border-slate-850" : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}>
+                      {item.sku}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  {/* Product name & quantity on right */}
+                  <div className="flex items-center gap-1.5 max-w-[70%]">
+                    <span className={`font-medium truncate ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`} title={item.name}>{item.name}</span>
+                    <span className={`font-mono font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                      theme === "dark" ? "text-cyan-400 bg-cyan-950/40 border-cyan-500/15" : "text-cyan-600 bg-cyan-50 border-cyan-200/50"
+                    }`}>
+                      {item.quantity} יח'
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
 
         {order.parsedItems.length > 3 && (
           <div className="mt-2.5 pt-2 border-t border-slate-900/10 dark:border-slate-900 flex justify-center">

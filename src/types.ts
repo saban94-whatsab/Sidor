@@ -26,6 +26,7 @@ export interface Order {
   deadlineTime?: string; // Format: YYYY-MM-DDTHH:mm or HH:mm
   reminderMinutes?: number; // Minutes before deadline to show a warning
   isArchived?: boolean; // Flag to indicate if the order has been archived (deep archive)
+  productImageUrl?: string | null; // Optional product image URL
 }
 
 export const STATUS_OPTIONS: OrderStatus[] = [
@@ -174,6 +175,7 @@ export function mapCsvToOrders(csvText: string): Order[] {
   const finalContactIdx = contactIdx !== -1 ? contactIdx : getIdx('קשר', 4);
   const finalItemsIdx = itemsIdx !== -1 ? itemsIdx : getIdx('פריטים', 5);
   const finalStatusIdx = statusIdx !== -1 ? statusIdx : getIdx('סטטוס', 6);
+  const finalImgIdx = headers.findIndex(h => h.includes('תמונ') || h.includes('image') || h.includes('img'));
   
   const parsedOrders: Order[] = [];
   
@@ -223,6 +225,7 @@ export function mapCsvToOrders(csvText: string): Order[] {
     
     const rawItems = row[finalItemsIdx] || "";
     const cleanOrderNumber = row[finalOrderNumIdx].trim().replace(/^["']|["']$/g, '');
+    const productImageUrl = finalImgIdx !== -1 && row[finalImgIdx] ? row[finalImgIdx].trim().replace(/^["']|["']$/g, '') : null;
     
     parsedOrders.push({
       id: `sheet-${cleanOrderNumber}-${i}`,
@@ -235,6 +238,7 @@ export function mapCsvToOrders(csvText: string): Order[] {
       parsedItems: parseItemsText(rawItems),
       status: status,
       notes: "",
+      productImageUrl: productImageUrl || null,
       statusLog: [
         {
           status: status,
