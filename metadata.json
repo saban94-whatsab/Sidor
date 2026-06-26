@@ -1,0 +1,6 @@
+{
+  "name": "Order Management Dashboard",
+  "description": "לוח ניהול הזמנות מתקדם ומחולל דוח בוקר לווטסאפ בתמיכה מלאה בעברית (RTL)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
